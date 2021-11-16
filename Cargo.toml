@@ -1,0 +1,23 @@
+[package]
+name = "tauri-invoke-http"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.56"
+authors = [ "Tauri Programme within The Commons Conservancy" ]
+categories = [ "gui", "web-programming" ]
+license = "Apache-2.0 OR MIT"
+homepage = "https://tauri.studio"
+repository = "https://github.com/tauri-apps/tauri-invoke-http"
+description = "Make tiny, secure apps for all desktop platforms with Tauri"
+exclude = [
+  "/examples",
+  ".license_template",
+  "CHANGELOG.md",
+  "/target"
+]
+
+[dependencies]
+tauri = { git = "https://github.com/tauri-apps/tauri/", branch = "next" }
+tiny_http = "0.9"
+portpicker = "0.1"
+serde_json = "1.0"

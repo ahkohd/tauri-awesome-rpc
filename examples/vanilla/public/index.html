@@ -1,0 +1,18 @@
+<html>
+
+<body>
+  <div>
+    HTTP Invoke
+    <div id="response"></div>
+  </div>
+  <script>
+    const response = document.getElementById('response');
+    window.__TAURI__.invoke('my_command', { args: 5 }).then(data => {
+      response.innerText = data;
+    }).catch(error => {
+      response.innerText = error;
+    });
+  </script>
+</body>
+
+</html>

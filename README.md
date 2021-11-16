@@ -1,0 +1,30 @@
+# Tauri Invoke HTTP
+
+This is a crate that provides a custom invoke system for Tauri using a localhost server.
+Each message is delivered through a `XMLHttpRequest` and the server is responsible for replying to it.
+
+## Usage
+
+First, add the dependency to your `src-tauri/Cargo.toml` file:
+
+```
+[dependencies]
+tauri-invoke-http = { git = "https://github.com/tauri-apps/tauri-invoke-http", branch = "dev" }
+```
+
+Then, setup the HTTP invoke system on the `main.rs` file:
+
+```rust
+fn main() {
+  // initialize the custom invoke system as a HTTP server, allowing the given origins to access it.
+  let http = tauri_invoke_http::Invoke::new(["tauri://localhost", "http://localhost:8080"]);
+  tauri::Builder::default()
+    .invoke_system(http.initialization_script(), http.responder())
+    .setup(move |app| {
+      http.start(app.handle());
+      Ok(())
+    })
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application")
+}
+```

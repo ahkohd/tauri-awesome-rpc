@@ -1,0 +1,16 @@
+{
+  "gitSiteUrl": "https://www.github.com/tauri-apps/tauri-invoke-http/",
+  "pkgManagers": {
+    "rust": {
+      "version": true,
+      "publish": true,
+      "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p' -"
+    }
+  },
+  "packages": {
+    "tauri-invoke-http": {
+      "path": ".",
+      "manager": "rust"
+    }
+  }
+}
