@@ -10,7 +10,11 @@ fn my_command(args: u64) -> Result<String, ()> {
 }
 
 fn main() {
-  let http = tauri_invoke_http::Invoke::new(["tauri://localhost", "http://localhost:8080"]);
+  let http = tauri_invoke_http::Invoke::new(if cfg!(feature = "custom-protocol") {
+    ["tauri://localhost"]
+  } else {
+    ["http://localhost:8080"]
+  });
   tauri::Builder::default()
     .invoke_system(http.initialization_script(), http.responder())
     .setup(move |app| {

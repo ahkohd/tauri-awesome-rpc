@@ -17,7 +17,7 @@ exclude = [
 ]
 
 [dependencies]
-tauri = { git = "https://github.com/tauri-apps/tauri/", branch = "next" }
+tauri = "1.0.0-rc.3"
 tiny_http = "0.9"
 portpicker = "0.1"
 serde_json = "1.0"

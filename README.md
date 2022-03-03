@@ -17,7 +17,11 @@ Then, setup the HTTP invoke system on the `main.rs` file:
 ```rust
 fn main() {
   // initialize the custom invoke system as a HTTP server, allowing the given origins to access it.
-  let http = tauri_invoke_http::Invoke::new(["tauri://localhost", "http://localhost:8080"]);
+  let http = tauri_invoke_http::Invoke::new(if cfg!(feature = "custom-protocol") {
+    ["tauri://localhost"]
+  } else {
+    ["http://localhost:8080"]
+  });
   tauri::Builder::default()
     .invoke_system(http.initialization_script(), http.responder())
     .setup(move |app| {

@@ -8,7 +8,9 @@ use std::{
   sync::{Arc, Mutex},
 };
 
-use tauri::{AppHandle, InvokePayload, InvokeResponder, InvokeResponse, Manager, Runtime};
+use tauri::{
+  api::ipc::CallbackFn, AppHandle, InvokePayload, InvokeResponder, InvokeResponse, Manager, Runtime,
+};
 use tiny_http::{Header, Method, Request, Response};
 
 fn cors<R: std::io::Read>(request: &Request, r: &mut Response<R>, allowed_origins: &[String]) {
@@ -26,7 +28,7 @@ fn cors<R: std::io::Read>(request: &Request, r: &mut Response<R>, allowed_origin
 pub struct Invoke {
   allowed_origins: Vec<String>,
   port: u16,
-  requests: Arc<Mutex<HashMap<String, Request>>>,
+  requests: Arc<Mutex<HashMap<usize, Request>>>,
 }
 
 impl Invoke {
@@ -47,7 +49,7 @@ impl Invoke {
     std::thread::spawn(move || {
       for mut request in server.incoming_requests() {
         if request.method() == &Method::Options {
-          let mut r = Response::empty(200);
+          let mut r = Response::empty(200u16);
           cors(&request, &mut r, &allowed_origins);
           request.respond(r).unwrap();
           continue;
@@ -57,7 +59,6 @@ impl Invoke {
         let window_label = pieces[1];
 
         if let Some(window) = app.get_window(window_label) {
-          let command = pieces[2].to_string();
           let content_type = request
             .headers()
             .iter()
@@ -72,11 +73,11 @@ impl Invoke {
           } else {
             unimplemented!()
           };
-          let req_key = payload.callback.clone();
+          let req_key = payload.callback.0.clone();
           requests.lock().unwrap().insert(req_key, request);
-          let _ = window.on_message(command, payload);
+          let _ = window.on_message(payload);
         } else {
-          let mut r = Response::empty(404);
+          let mut r = Response::empty(404u16);
           cors(&request, &mut r, &allowed_origins);
           request.respond(r).unwrap();
         }
@@ -87,10 +88,10 @@ impl Invoke {
   pub fn responder<R: Runtime>(&self) -> Box<InvokeResponder<R>> {
     let requests = self.requests.clone();
     let allowed_origins = self.allowed_origins.clone();
-    let responder = move |_window, response: InvokeResponse, callback, _error| {
-      let request = requests.lock().unwrap().remove(&callback).unwrap();
+    let responder = move |_window, response: InvokeResponse, callback: CallbackFn, _error| {
+      let request = requests.lock().unwrap().remove(&callback.0).unwrap();
       let response = response.into_result();
-      let status = if response.is_ok() { 200 } else { 400 };
+      let status: u16 = if response.is_ok() { 200 } else { 400 };
 
       let mut r = Response::from_string(
         serde_json::to_string(&match response {
@@ -111,7 +112,7 @@ impl Invoke {
     format!(
       "
         Object.defineProperty(window, '__TAURI_POST_MESSAGE__', {{
-          value: (command, args) => {{
+          value: (message) => {{
             const request = new XMLHttpRequest();
             request.addEventListener('load', function () {{
               let arg
@@ -122,11 +123,11 @@ impl Invoke {
                 arg = e
                 success = false
               }}
-              window[success ? args.callback : args.error](arg)
+              window[`_${{success ? message.callback : message.error}}`](arg)
             }})
-            request.open('POST', 'http://localhost:{}/' + window.__TAURI__.__currentWindow.label + '/' + command, true)
+            request.open('POST', 'http://localhost:{}/' + window.__TAURI_METADATA__.__currentWindow.label, true)
             request.setRequestHeader('Content-Type', 'application/json')
-            request.send(JSON.stringify(args))
+            request.send(JSON.stringify(message))
           }}
         }})
     ",
