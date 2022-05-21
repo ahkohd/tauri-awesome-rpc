@@ -11,7 +11,7 @@ First, add the dependency to your `src-tauri/Cargo.toml` file:
 
 ```
 [dependencies]
-tauri-awesome-rpc = { git = "https://github.com/tauri-apps/tauri-awesome-rpc", branch = "dev" }
+tauri-awesome-rpc = { git = "https://github.com/ahkohd/tauri-awesome-rpc", branch = "dev" }
 ```
 
 Then, setup the HTTP invoke system on the `main.rs` file:
@@ -35,8 +35,6 @@ fn report_time_elapsed(window: Window<Wry>) {
 
     loop {
       interval.tick().await;
-
-      println!("tick: {:?}", start_time.elapsed());
 
       window
         .state::<AwesomeEmit>()
