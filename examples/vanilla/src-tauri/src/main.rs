@@ -10,7 +10,7 @@ use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc};
 #[tauri::command]
 fn my_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
-  Ok("executed - hello world".into())
+  Ok("executed".into())
 }
 
 #[tauri::command]
@@ -30,7 +30,7 @@ fn report_time_elapsed(window: Window<Wry>) {
 }
 
 fn main() {
-  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost"]);
+  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost", "http://localhost:*"]);
 
   tauri::Builder::default()
     .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())

@@ -1,16 +1,19 @@
 <html>
   <body>
     <div>
-      <h1>Tauri AwesomeRpc</h1>
+      <h1>tauri-awesome-rpc</h1>
 
-      <h5>Awesome Invoke test</h5>
+      <h5>invoke test</h5>
       <div id="response"></div>
 
-      <h5>AwesomeEvent/Emit test</h5>
+      <h5>AwesomeEvent.listen test</h5>
       <div id="time_elapsed"></div>
     </div>
+
     <script>
       const response = document.getElementById("response");
+      const timeElapsed = document.getElementById("time_elapsed");
+
       window.__TAURI__
         .invoke("my_command", { args: 5 })
         .then((data) => {
@@ -23,9 +26,8 @@
 
       window.__TAURI__.invoke("report_time_elapsed");
 
-      const timeElapsedElem = document.getElementById("time_elapsed");
-      let unsub = window.AwesomeEvent.listen("time_elapsed", (data) => {
-        timeElapsedElem.innerText = JSON.stringify(data);
+      let _unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
+        timeElapsed.innerText = JSON.stringify(data);
       });
     </script>
   </body>
