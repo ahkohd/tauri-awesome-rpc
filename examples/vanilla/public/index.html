@@ -1,18 +1,32 @@
 <html>
+  <body>
+    <div>
+      <h1>Tauri AwesomeRpc</h1>
 
-<body>
-  <div>
-    HTTP Invoke
-    <div id="response"></div>
-  </div>
-  <script>
-    const response = document.getElementById('response');
-    window.__TAURI__.invoke('my_command', { args: 5 }).then(data => {
-      response.innerText = data;
-    }).catch(error => {
-      response.innerText = error;
-    });
-  </script>
-</body>
+      <h5>Awesome Invoke test</h5>
+      <div id="response"></div>
 
+      <h5>AwesomeEvent/Emit test</h5>
+      <div id="time_elapsed"></div>
+    </div>
+    <script>
+      const response = document.getElementById("response");
+      window.__TAURI__
+        .invoke("my_command", { args: 5 })
+        .then((data) => {
+          response.innerText = data;
+        })
+        .catch((error) => {
+          console.log(error, "error");
+          response.innerText = error;
+        });
+
+      window.__TAURI__.invoke("report_time_elapsed");
+
+      const timeElapsedElem = document.getElementById("time_elapsed");
+      let unsub = window.AwesomeEvent.listen("time_elapsed", (data) => {
+        timeElapsedElem.innerText = JSON.stringify(data);
+      });
+    </script>
+  </body>
 </html>

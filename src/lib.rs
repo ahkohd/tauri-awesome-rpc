@@ -1,137 +1,239 @@
-// Copyright 2019-2021 Tauri Programme within The Commons Conservancy
-// SPDX-License-Identifier: Apache-2.0
-// SPDX-License-Identifier: MIT
+use jsonrpc_ws_server::jsonrpc_core::{serde::Serialize, *};
+use jsonrpc_ws_server::*;
+use serde::Deserialize;
+use serde_json::json;
+use tauri::api::ipc::CallbackFn;
+use tauri::{AppHandle, InvokePayload, InvokeResponder, InvokeResponse, Manager, Runtime, Window};
 
-use std::{
-  collections::HashMap,
-  str::FromStr,
-  sync::{Arc, Mutex},
-};
-
-use tauri::{
-  api::ipc::CallbackFn, AppHandle, InvokePayload, InvokeResponder, InvokeResponse, Manager, Runtime,
-};
-use tiny_http::{Header, Method, Request, Response};
-
-fn cors<R: std::io::Read>(request: &Request, r: &mut Response<R>, allowed_origins: &[String]) {
-  if let Some(origin) = request.headers().iter().find(|h| h.field.equiv("Origin")) {
-    if allowed_origins.iter().any(|o| o == &origin.value) {
-      r.add_header(
-        Header::from_str(&format!("Access-Control-Allow-Origin: {}", origin.value)).unwrap(),
-      );
-    }
-  }
-  r.add_header(Header::from_str("Access-Control-Allow-Headers: *").unwrap());
-  r.add_header(Header::from_str("Access-Control-Allow-Methods: POST, OPTIONS").unwrap());
+#[derive(Serialize, Deserialize)]
+struct InvokeRpcParams {
+  window_label: String,
+  payload: String,
 }
 
-pub struct Invoke {
-  allowed_origins: Vec<String>,
+#[derive(Serialize, Deserialize)]
+enum RpcResponseStatus {
+  Processing,
+  Success,
+  Error,
+  Invalid,
+}
+
+#[derive(Serialize, Deserialize)]
+struct RpcResult {
+  status: RpcResponseStatus,
+  data: Value,
+}
+
+pub struct AwesomeRpc {
   port: u16,
-  requests: Arc<Mutex<HashMap<usize, Request>>>,
+  allowed_origins: DomainsValidation<Origin>,
 }
 
-impl Invoke {
-  pub fn new<I: Into<String>, O: IntoIterator<Item = I>>(allowed_origins: O) -> Self {
+impl AwesomeRpc {
+  pub fn new(allowed_origins: Vec<&str>) -> Self {
     let port = portpicker::pick_unused_port().expect("failed to get unused port for invoke");
-    let requests = Arc::new(Mutex::new(HashMap::new()));
+    let allowed_origins =
+      DomainsValidation::AllowOnly(allowed_origins.iter().map(|i| i.into()).collect());
+
     Self {
-      allowed_origins: allowed_origins.into_iter().map(|o| o.into()).collect(),
       port,
-      requests,
+      allowed_origins,
     }
   }
 
-  pub fn start<R: Runtime>(&self, app: AppHandle<R>) {
-    let server = tiny_http::Server::http(format!("localhost:{}", self.port)).unwrap();
-    let requests = self.requests.clone();
-    let allowed_origins = self.allowed_origins.clone();
-    std::thread::spawn(move || {
-      for mut request in server.incoming_requests() {
-        if request.method() == &Method::Options {
-          let mut r = Response::empty(200u16);
-          cors(&request, &mut r, &allowed_origins);
-          request.respond(r).unwrap();
-          continue;
-        }
-        let url = request.url().to_string();
-        let pieces = url.split("/").collect::<Vec<_>>();
-        let window_label = pieces[1];
+  pub fn start<R: Runtime>(&self, app_handle: AppHandle<R>) {
+    let handle = app_handle.clone();
 
-        if let Some(window) = app.get_window(window_label) {
-          let content_type = request
-            .headers()
-            .iter()
-            .find(|h| h.field.equiv("Content-Type"))
-            .map(|h| h.value.to_string())
-            .unwrap_or_else(|| "application/json".into());
+    let mut io = IoHandler::new();
+    io.add_method("invoke", move |params: Params| {
+      let params = params.parse::<InvokeRpcParams>().unwrap();
 
-          let payload: InvokePayload = if content_type == "application/json" {
-            let mut content = String::new();
-            request.as_reader().read_to_string(&mut content).unwrap();
-            serde_json::from_str(&content).unwrap()
-          } else {
-            unimplemented!()
-          };
-          let req_key = payload.callback.0.clone();
-          requests.lock().unwrap().insert(req_key, request);
-          let _ = window.on_message(payload);
-        } else {
-          let mut r = Response::empty(404u16);
-          cors(&request, &mut r, &allowed_origins);
-          request.respond(r).unwrap();
-        }
+      if let Some(window) = handle.get_window(params.window_label.as_str()) {
+        let payload = serde_json::from_str::<InvokePayload>(params.payload.as_str()).unwrap();
+        let _ = window.on_message(payload);
+
+        return Ok(json!(RpcResult {
+          status: RpcResponseStatus::Processing,
+          data: Value::Null
+        }));
       }
+
+      Ok(json!(RpcResult {
+        status: RpcResponseStatus::Invalid,
+        data: Value::String("Malformed request".into())
+      }))
     });
+
+    let server = ServerBuilder::new(io)
+      .allowed_origins(self.allowed_origins.clone())
+      .start(&format!("0.0.0.0:{}", self.port).as_str().parse().unwrap())
+      .expect("RPC server must start with no issues");
+
+    app_handle.manage(AwesomeEmit::new(server.broadcaster().clone()));
+
+    tauri::async_runtime::spawn(async { server.wait().unwrap() });
   }
 
-  pub fn responder<R: Runtime>(&self) -> Box<InvokeResponder<R>> {
-    let requests = self.requests.clone();
-    let allowed_origins = self.allowed_origins.clone();
-    let responder = move |_window, response: InvokeResponse, callback: CallbackFn, _error| {
-      let request = requests.lock().unwrap().remove(&callback.0).unwrap();
+  pub fn responder<R: Runtime>() -> Box<InvokeResponder<R>> {
+    let responder = move |window: Window<R>,
+                          response: InvokeResponse,
+                          callback: CallbackFn,
+                          error: CallbackFn| {
       let response = response.into_result();
-      let status: u16 = if response.is_ok() { 200 } else { 400 };
 
-      let mut r = Response::from_string(
-        serde_json::to_string(&match response {
-          Ok(r) => r,
-          Err(e) => e,
-        })
-        .unwrap(),
-      )
-      .with_status_code(status);
-      cors(&request, &mut r, &allowed_origins);
+      #[derive(Serialize, Deserialize)]
+      struct JsonRpcResponse {
+        jsonrpc: String,
+        id: usize,
+        result: RpcResult,
+      }
 
-      request.respond(r).unwrap();
+      let result = match response {
+        Ok(r) => RpcResult {
+          status: RpcResponseStatus::Success,
+          data: r,
+        },
+        Err(e) => RpcResult {
+          status: RpcResponseStatus::Error,
+          data: e,
+        },
+      };
+
+      let r = JsonRpcResponse {
+        jsonrpc: "2.0".into(),
+        id: callback.0 + error.0,
+        result,
+      };
+
+      window.state::<AwesomeEmit>().send(r);
     };
+
     Box::new(responder)
   }
 
   pub fn initialization_script(&self) -> String {
     format!(
       "
-        Object.defineProperty(window, '__TAURI_POST_MESSAGE__', {{
-          value: (message) => {{
-            const request = new XMLHttpRequest();
-            request.addEventListener('load', function () {{
-              let arg
-              let success = this.status === 200
-              try {{
-                arg = JSON.parse(this.response)
-              }} catch (e) {{ 
-                arg = e
-                success = false
+      Object.defineProperty(window, '__TAURI_POST_MESSAGE__', {{
+        value: (message) => {{
+          const ws = new WebSocket('ws://localhost:{}', \"json\");
+          const rpcMethodId = message.callback + message.error;
+
+          ws.onmessage = function (event) {{
+            let rpcMessage = JSON.parse(event.data);
+
+            if (rpcMessage.id === rpcMethodId) {{
+              if ([\"Invalid\", \"Error\"].includes(rpcMessage.result.status)) {{
+                window[`_${{message.error}}`](rpcMessage.result.data);
+                ws.close();
               }}
-              window[`_${{success ? message.callback : message.error}}`](arg)
+
+              if (rpcMessage.result.status === \"Success\") {{
+                window[`_${{message.callback}}`](rpcMessage.result.data);
+                ws.close();
+              }}
+            }}
+          }};
+
+        ws.onerror = (e) => {{
+          ws.close();
+          window[`_${{message.error}}`](e)
+        }};
+
+
+        ws.onopen = () => {{
+          ws.send(
+            JSON.stringify({{
+              jsonrpc: \"2.0\",
+              id: rpcMethodId,
+              method: \"invoke\",
+              params: {{window_label: window.__TAURI_METADATA__.__currentWindow.label, payload: JSON.stringify(message) }},
             }})
-            request.open('POST', 'http://localhost:{}/' + window.__TAURI_METADATA__.__currentWindow.label, true)
-            request.setRequestHeader('Content-Type', 'application/json')
-            request.send(JSON.stringify(message))
+          );
+        }};
+
+        }}
+      }});
+
+
+      Object.defineProperty(window, 'AwesomeEvent', {{
+        value: {{
+          listen: (event_name, callback) => {{
+            const ws = new WebSocket('ws://localhost:{}', \"json\");
+            ws.onmessage = function (event) {{
+              let message = JSON.parse(event.data);
+
+              if (message.event_name && message.event_name === event_name && [null, window.__TAURI_METADATA__.__currentWindow.label].includes(message.window_label)) {{
+                callback(message.payload);
+              }}
+            }};
+
+            ws.onerror = (e) => {{
+              ws.close();
+            }};
+
+            return () => ws.close();
           }}
-        }})
+        }}
+      }})
     ",
-      self.port
+      self.port, self.port
     )
+  }
+}
+
+#[derive(Serialize)]
+struct AwesomeEvent<P> {
+  event_name: String,
+  window_label: Option<String>,
+  payload: P,
+}
+
+#[derive(Clone)]
+pub struct AwesomeEmit {
+  broadcaster: Broadcaster,
+}
+
+impl AwesomeEmit {
+  pub fn new(broadcaster: Broadcaster) -> Self {
+    Self { broadcaster }
+  }
+
+  pub fn send<P: Serialize>(&self, payload: P) {
+    self
+      .broadcaster
+      .send(serde_json::to_string(&payload).unwrap())
+      .unwrap();
+  }
+
+  #[allow(dead_code)]
+  pub fn emit_all<P: Serialize>(&self, name: &str, payload: P) {
+    self
+      .broadcaster
+      .send(
+        serde_json::to_string(&AwesomeEvent {
+          event_name: name.into(),
+          window_label: None,
+          payload,
+        })
+        .unwrap(),
+      )
+      .unwrap();
+  }
+
+  #[allow(dead_code)]
+  pub fn emit<P: Serialize>(&self, window_label: &str, name: &str, payload: P) {
+    self
+      .broadcaster
+      .send(
+        serde_json::to_string(&AwesomeEvent {
+          event_name: name.into(),
+          window_label: Some(window_label.into()),
+          payload,
+        })
+        .unwrap(),
+      )
+      .unwrap();
   }
 }

@@ -1,23 +1,20 @@
 [package]
-name = "tauri-invoke-http"
+name = "tauri-awesome-rpc"
 version = "0.0.0"
 edition = "2021"
 rust-version = "1.56"
-authors = [ "Tauri Programme within The Commons Conservancy" ]
-categories = [ "gui", "web-programming" ]
+authors = ["Tauri Programme within The Commons Conservancy"]
+categories = ["gui", "web-programming"]
 license = "Apache-2.0 OR MIT"
 homepage = "https://tauri.studio"
-repository = "https://github.com/tauri-apps/tauri-invoke-http"
+repository = "https://github.com/tauri-apps/tauri-awesome-rpc"
 description = "Make tiny, secure apps for all desktop platforms with Tauri"
-exclude = [
-  "/examples",
-  ".license_template",
-  "CHANGELOG.md",
-  "/target"
-]
+exclude = ["/examples", ".license_template", "CHANGELOG.md", "/target"]
 
 [dependencies]
 tauri = "1.0.0-rc.3"
 tiny_http = "0.9"
 portpicker = "0.1"
 serde_json = "1.0"
+jsonrpc-ws-server = "15.0"
+serde = "1.0.137"

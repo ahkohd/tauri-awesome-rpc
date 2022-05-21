@@ -1,5 +1,5 @@
 ---
-"tauri-invoke-http": "minor"
+"tauri-awesome-rpc": "minor"
 ---
 
 Initial release.
