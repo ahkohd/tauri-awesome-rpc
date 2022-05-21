@@ -35,7 +35,6 @@ fn main() {
     .expect("error while running tauri application")
 }
 
-
 #[tauri::command]
 fn my_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
@@ -64,7 +63,7 @@ fn report_time_elapsed(window: Window<Wry>) {
 Then, on the frontend:
 
 - Use your Tauri `invoke` method as usual.
-- Use `AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
+- Use `window.AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
 
 ```html
 <html>
