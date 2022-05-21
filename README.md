@@ -66,8 +66,6 @@ Then, on the frontend:
 - Use your Tauri `invoke` method as usual.
 - Use `AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
 
-````rust
-
 ```html
 <html>
   <body>
@@ -103,7 +101,7 @@ Then, on the frontend:
     </script>
   </body>
 </html>
-````
+```
 
 ### TypeScript 🔥
 
