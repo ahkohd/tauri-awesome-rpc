@@ -104,12 +104,12 @@ Then, on the frontend:
 
 ### TypeScript 🔥
 
-Add the following type definition to your `global.d.ts` file:
+Add the following type definition to your project's `global.d.ts` file:
 
 ```typescript
 interface Window {
   AwesomeEvent: {
-    listen(event_name: string, callback: (data) => void): () => void;
+    listen(eventName: string, callback: (data) => void): () => void;
   };
 }
 ```
