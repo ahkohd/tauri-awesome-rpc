@@ -1,11 +1,11 @@
-# Tauri AwesomeRpc
+# 😎 tauri-awesome-rpc
 
-This is a crate provides a custom invoke system for Tauri using a localhost json RPC websocket.
-Each message is delivered through a `Websocket` using Parity JSON RPC 2.0 specification.
+This is a crate provides a custom invoke system for Tauri using a localhost JSON RPC WebSocket.
+Each message is delivered through Websocket using JSON RPC 2.0 [specification](https://www.jsonrpc.org/specification).
 
-With the advantage of using websocket, this library also provides a way for the Rust backend to emit events to the frontend using `AwesomeEmit` & `AwesomeEvent`.
+With the advantage of using websocket, `tauri-awesome-rpc` also provides an event API. With `AwesomeEmit` you can emit event from the Rust backend and `AwesomeEvent` to listen to the event on the frontend.
 
-## Usage
+## Usage 🔧
 
 First, add the dependency to your `src-tauri/Cargo.toml` file:
 
@@ -14,16 +14,32 @@ First, add the dependency to your `src-tauri/Cargo.toml` file:
 tauri-awesome-rpc = { git = "https://github.com/ahkohd/tauri-awesome-rpc", branch = "dev" }
 ```
 
-Then, setup the Websocket RPC invoke system on the `main.rs` file:
+Then, setup the Websocket JSON RPC invoke system on the `main.rs` file:
 
 ```rust
-use serde_json::json;
 use tauri::{Manager, Window, Wry};
 use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc};
+use serde_json::json;
+
+fn main() {
+  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost", "http://localhost:*"]);
+
+  tauri::Builder::default()
+    .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())
+    .setup(move |app| {
+      awesome_rpc.start(app.handle());
+      Ok(())
+    })
+    .invoke_handler(tauri::generate_handler![my_command, report_time_elapsed])
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application")
+}
+
 
 #[tauri::command]
 fn my_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
+
   Ok("executed".into())
 }
 
@@ -36,44 +52,39 @@ fn report_time_elapsed(window: Window<Wry>) {
     loop {
       interval.tick().await;
 
+      // emit an awesome event to the main window
       window
         .state::<AwesomeEmit>()
         .emit("main", "time_elapsed", json!(start_time.elapsed()));
     }
   });
 }
-
-fn main() {
-  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost"]);
-
-  tauri::Builder::default()
-    .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())
-    .setup(move |app| {
-      awesome_rpc.start(app.handle());
-      Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![my_command, report_time_elapsed])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application")
-}
 ```
 
-## frontend
+Then, on the frontend:
+
+- Use your Tauri `invoke` method as usual.
+- Use `AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
+
+````rust
 
 ```html
 <html>
   <body>
     <div>
-      <h1>Tauri AwesomeRpc</h1>
+      <h1>tauri-awesome-rpc</h1>
 
-      <h5>Awesome Invoke test</h5>
+      <h5>invoke test</h5>
       <div id="response"></div>
 
-      <h5>AwesomeEvent/Emit test</h5>
+      <h5>AwesomeEvent.listen test</h5>
       <div id="time_elapsed"></div>
     </div>
+
     <script>
       const response = document.getElementById("response");
+      const timeElapsed = document.getElementById("time_elapsed");
+
       window.__TAURI__
         .invoke("my_command", { args: 5 })
         .then((data) => {
@@ -86,11 +97,22 @@ fn main() {
 
       window.__TAURI__.invoke("report_time_elapsed");
 
-      const timeElapsedElem = document.getElementById("time_elapsed");
-      let unsub = window.AwesomeEvent.listen("time_elapsed", (data) => {
-        timeElapsedElem.innerText = JSON.stringify(data);
+      let _unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
+        timeElapsed.innerText = JSON.stringify(data);
       });
     </script>
   </body>
 </html>
+````
+
+### TypeScript 🔥
+
+Add the following type definition to your `global.d.ts` file:
+
+```typescript
+interface Window {
+  AwesomeEvent: {
+    listen(event_name: string, callback: (data) => void): () => void;
+  };
+}
 ```
