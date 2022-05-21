@@ -3,12 +3,12 @@ name = "tauri-awesome-rpc"
 version = "0.0.0"
 edition = "2021"
 rust-version = "1.56"
-authors = ["Tauri Programme within The Commons Conservancy"]
+authors = ["Tauri Programme within The Commons Conservancy", "Victor Aremu"]
 categories = ["gui", "web-programming"]
 license = "Apache-2.0 OR MIT"
 homepage = "https://tauri.studio"
 repository = "https://github.com/ahkohd/tauri-awesome-rpc"
-description = "Make tiny, secure apps for all desktop platforms with Tauri"
+description = "😎 A custom invoke system for Tauri that leverages WebSockets"
 exclude = ["/examples", ".license_template", "CHANGELOG.md", "/target"]
 
 [dependencies]
