@@ -46,7 +46,7 @@ impl AwesomeRpc {
     let handle = app_handle.clone();
 
     let mut io = IoHandler::new();
-    io.add_method("invoke", move |params: Params| {
+    io.add_sync_method("invoke", move |params: Params| {
       let params = params.parse::<InvokeRpcParams>().unwrap();
 
       if let Some(window) = handle.get_window(params.window_label.as_str()) {
