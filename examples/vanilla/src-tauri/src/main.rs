@@ -22,8 +22,6 @@ fn report_time_elapsed(window: Window<Wry>) {
     loop {
       interval.tick().await;
 
-      println!("tick: {:?}", start_time.elapsed());
-
       window
         .state::<AwesomeEmit>()
         .emit("main", "time_elapsed", json!(start_time.elapsed()));
