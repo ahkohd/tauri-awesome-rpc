@@ -67,6 +67,7 @@ impl AwesomeRpc {
 
     let server = ServerBuilder::new(io)
       .allowed_origins(self.allowed_origins.clone())
+      .max_connections(usize::MAX)
       .start(&format!("0.0.0.0:{}", self.port).as_str().parse().unwrap())
       .expect("RPC server must start with no issues");
 
