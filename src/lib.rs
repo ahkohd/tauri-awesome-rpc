@@ -126,11 +126,13 @@ impl AwesomeRpc {
             if (rpcMessage.id === rpcMethodId) {{
               if ([\"Invalid\", \"Error\"].includes(rpcMessage.result.status)) {{
                 window[`_${{message.error}}`](rpcMessage.result.data);
+                delete window[`_${{message.error}}`];
                 ws.close();
               }}
 
               if (rpcMessage.result.status === \"Success\") {{
                 window[`_${{message.callback}}`](rpcMessage.result.data);
+                delete window[`_${{message.callback}}`];
                 ws.close();
               }}
             }}
@@ -139,6 +141,7 @@ impl AwesomeRpc {
         ws.onerror = (e) => {{
           ws.close();
           window[`_${{message.error}}`](e)
+          delete window[`_${{message.error}}`];
         }};
 
 
