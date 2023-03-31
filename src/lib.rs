@@ -70,7 +70,7 @@ impl AwesomeRpc {
       .start(&format!("0.0.0.0:{}", self.port).as_str().parse().unwrap())
       .expect("RPC server must start with no issues");
 
-    app_handle.manage(AwesomeEmit::new(server.broadcaster().clone()));
+    app_handle.manage(AwesomeEmit::new(server.broadcaster()));
 
     tauri::async_runtime::spawn(async { server.wait().unwrap() });
   }
