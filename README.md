@@ -42,7 +42,7 @@ fn main() {
       awesome_rpc.start(app.handle());
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![my_command, report_time_elapsed])
+    .invoke_handler(tauri::generate_handler![test_command, report_time_elapsed])
     .run(tauri::generate_context!())
     .expect("error while running tauri application")
 }
