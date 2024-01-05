@@ -50,7 +50,6 @@ fn main() {
 #[tauri::command]
 fn test_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
-
   Ok("executed".into())
 }
 
