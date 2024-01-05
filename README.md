@@ -5,7 +5,7 @@ Each message is delivered through Websocket using JSON RPC 2.0 [specification](h
 
 With the advantage of using websocket, `tauri-awesome-rpc` also provides an event API. With `AwesomeEmit` you can emit event from the Rust backend and `AwesomeEvent` to listen to the event on the frontend.
 
-## Usage 🔧
+## Usage
 
 First, add the dependency to your `src-tauri/Cargo.toml` file:
 
