@@ -22,7 +22,19 @@ use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc};
 use serde_json::json;
 
 fn main() {
-  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost", "http://localhost:*"]);
+  #[cfg(dev)]
+  let allowed_domain = {
+    let config: tauri_utils::config::Config = serde_json::from_value(
+      tauri_utils::config::parse::read_from(std::env::current_dir().unwrap()).unwrap(),
+    )
+    .unwrap();
+    config.build.dev_path.to_string()
+  };
+
+  #[cfg(not(dev))]
+  let allowed_domain = "tauri://localhost".to_string();
+
+  let awesome_rpc = AwesomeRpc::new(vec![&allowed_domain]);
 
   tauri::Builder::default()
     .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())
@@ -36,7 +48,7 @@ fn main() {
 }
 
 #[tauri::command]
-fn my_command(args: u64) -> Result<String, ()> {
+fn test_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
 
   Ok("executed".into())
@@ -62,9 +74,6 @@ fn report_time_elapsed(window: Window<Wry>) {
 
 Then, on the frontend:
 
-- Use your Tauri `invoke` method as usual.
-- Use `window.AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
-
 ```html
 <html>
   <body>
@@ -77,32 +86,32 @@ Then, on the frontend:
       <h5>AwesomeEvent.listen test</h5>
       <div id="time_elapsed"></div>
     </div>
-
-    <script>
-      const response = document.getElementById("response");
-      const timeElapsed = document.getElementById("time_elapsed");
-
-      window.__TAURI__
-        .invoke("my_command", { args: 5 })
-        .then((data) => {
-          response.innerText = data;
-        })
-        .catch((error) => {
-          console.log(error, "error");
-          response.innerText = error;
-        });
-
-      window.__TAURI__.invoke("report_time_elapsed");
-
-      let _unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
-        timeElapsed.innerText = JSON.stringify(data);
-      });
-    </script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
 ```
 
-### TypeScript 🔥
+- Use your Tauri `invoke` method as usual.
+- Use `window.AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
+
+```ts
+import { invoke } from "@tauri-apps/api/tauri";
+
+const response = document.getElementById("response") as HTMLDivElement;
+const timeElapsed = document.getElementById("time_elapsed") as HTMLDivElement;
+
+invoke("test_command", { args: 5 })
+  .then((data) => {
+    response.innerText = data as string;
+  })
+  .catch(console.error);
+
+invoke("report_time_elapsed");
+
+const _unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
+  timeElapsed.innerText = JSON.stringify(data);
+});
+```
 
 Add the following type definition to your project's `global.d.ts` file:
 
