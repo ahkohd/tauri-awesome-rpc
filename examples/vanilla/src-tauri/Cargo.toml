@@ -10,12 +10,13 @@ rust-version = "1.56"
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.0.0-rc.3", features = ["protocol-all"] }
+tauri = { version = "1.5.4", features = [] }
+tauri-utils = "1.4.0"
 tauri-awesome-rpc = { path = "../../../" }
 tokio = { version = "1.18.2", features = ["rt", "time"] }
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.3", features = [] }
+tauri-build = { version = "1.5.1", features = [] }
 
 [features]
 default = ["custom-protocol"]

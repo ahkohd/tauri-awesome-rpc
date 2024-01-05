@@ -8,7 +8,7 @@ use tauri::{Manager, Window, Wry};
 use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc};
 
 #[tauri::command]
-fn my_command(args: u64) -> Result<String, ()> {
+fn test_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
   Ok("executed".into())
 }
@@ -30,7 +30,19 @@ fn report_time_elapsed(window: Window<Wry>) {
 }
 
 fn main() {
-  let awesome_rpc = AwesomeRpc::new(vec!["tauri://localhost", "http://localhost:*"]);
+  #[cfg(dev)]
+  let allowed_domain = {
+    let config: tauri_utils::config::Config = serde_json::from_value(
+      tauri_utils::config::parse::read_from(std::env::current_dir().unwrap()).unwrap(),
+    )
+    .unwrap();
+    config.build.dev_path.to_string()
+  };
+
+  #[cfg(not(dev))]
+  let allowed_domain = "tauri://localhost".to_string();
+
+  let awesome_rpc = AwesomeRpc::new(vec![&allowed_domain]);
 
   tauri::Builder::default()
     .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())
@@ -38,7 +50,7 @@ fn main() {
       awesome_rpc.start(app.handle());
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![my_command, report_time_elapsed])
+    .invoke_handler(tauri::generate_handler![test_command, report_time_elapsed])
     .run(tauri::generate_context!())
     .expect("error while running tauri application")
 }

@@ -4,9 +4,11 @@
     "version": "0.1.0"
   },
   "build": {
-    "distDir": "../public",
-    "devPath": "../public",
-    "withGlobalTauri": true
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
   },
   "tauri": {
     "bundle": {
@@ -46,10 +48,7 @@
       "active": false
     },
     "allowlist": {
-      "all": false,
-      "protocol": {
-        "all": true
-      }
+      "all": false
     },
     "windows": [
       {
@@ -62,7 +61,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'"
     }
   }
 }
