@@ -1,14 +1,11 @@
-{{{{raw}}}}
 name: covector version or publish
 on:
   push:
     branches:
-    - dev
-
+      - dev
 jobs:
   covector:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,4 +33,3 @@ jobs:
           labels: "version updates"
           branch: "release"
           body: ${{ steps.covector.outputs.change }}
-{{{{/raw}}}}

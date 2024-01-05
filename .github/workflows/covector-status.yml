@@ -1,11 +1,8 @@
-{{{{raw}}}}
 name: covector status
 on: [pull_request]
-
 jobs:
   covector:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -14,4 +11,3 @@ jobs:
         uses: jbolda/covector/packages/action@covector-v0
         with:
           command: 'status'
-{{{{/raw}}}}
