@@ -37,7 +37,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: echo "CURRENT_DATE=$(Get-Date -Format "yyyy-MM-dd")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Cache cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
           # Add date to the cache to keep it up to date
@@ -46,7 +46,7 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.rust }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
       - name: Cache cargo index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           # Add date to the cache to keep it up to date
@@ -55,7 +55,7 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.rust }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
       - name: Cache cargo target
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ matrix.project}}/target
           # Add date to the cache to keep it up to date
