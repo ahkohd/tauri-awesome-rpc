@@ -1,13 +1,79 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri Awesome RPC Example</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 30px;
+        text-align: center;
+      }
+      .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      h5 {
+        color: #666;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      .result {
+        padding: 10px;
+        background: #e8f5e9;
+        border-radius: 3px;
+        font-family: monospace;
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+      }
+      #time_elapsed {
+        background: #e3f2fd;
+      }
+      .info {
+        color: #888;
+        font-size: 14px;
+        margin-top: 20px;
+        text-align: center;
+      }
+    </style>
+  </head>
   <body>
-    <div>
-      <h1>tauri-awesome-rpc</h1>
+    <div class="container">
+      <h1>😎 tauri-awesome-rpc</h1>
 
-      <h5>invoke test</h5>
-      <div id="response"></div>
+      <div class="section">
+        <h5>Invoke Test</h5>
+        <div id="response" class="result">Waiting for response...</div>
+      </div>
 
-      <h5>AwesomeEvent.listen test</h5>
-      <div id="time_elapsed"></div>
+      <div class="section">
+        <h5>AwesomeEvent.listen Test</h5>
+        <div id="time_elapsed" class="result">Waiting for events...</div>
+      </div>
+
+      <div class="info">
+        This example demonstrates WebSocket-based RPC communication
+        <br />
+        between the frontend and Rust backend in Tauri v2
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

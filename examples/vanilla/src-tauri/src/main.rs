@@ -4,7 +4,7 @@
 )]
 
 use serde_json::json;
-use tauri::{Manager, Window, Wry};
+use tauri::{Manager, WebviewWindow};
 use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc};
 
 #[tauri::command]
@@ -14,7 +14,7 @@ fn test_command(args: u64) -> Result<String, ()> {
 }
 
 #[tauri::command]
-fn report_time_elapsed(window: Window<Wry>) {
+fn report_time_elapsed(window: WebviewWindow) {
   tauri::async_runtime::spawn(async move {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
     let start_time = std::time::Instant::now();
@@ -30,24 +30,18 @@ fn report_time_elapsed(window: Window<Wry>) {
 }
 
 fn main() {
-  #[cfg(dev)]
-  let allowed_domain = {
-    let config: tauri_utils::config::Config = serde_json::from_value(
-      tauri_utils::config::parse::read_from(std::env::current_dir().unwrap()).unwrap(),
-    )
-    .unwrap();
-    config.build.dev_path.to_string()
+  let allowed_origins = if cfg!(dev) {
+    vec!["http://localhost:1420", "http://localhost:5173"]
+  } else {
+    vec!["tauri://localhost", "https://tauri.localhost"]
   };
 
-  #[cfg(not(dev))]
-  let allowed_domain = "tauri://localhost".to_string();
-
-  let awesome_rpc = AwesomeRpc::new(vec![&allowed_domain]);
+  let awesome_rpc = AwesomeRpc::new(allowed_origins);
 
   tauri::Builder::default()
-    .invoke_system(awesome_rpc.initialization_script(), AwesomeRpc::responder())
+    .invoke_system(awesome_rpc.initialization_script())
     .setup(move |app| {
-      awesome_rpc.start(app.handle());
+      awesome_rpc.start(app.handle().clone());
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![test_command, report_time_elapsed])

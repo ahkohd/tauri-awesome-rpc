@@ -1,0 +1,27 @@
+{
+  "name": "@tauri-awesome-rpc/api",
+  "version": "0.1.0",
+  "description": "TypeScript API for tauri-awesome-rpc",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "tauri",
+    "rpc",
+    "websocket",
+    "json-rpc"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ]
+}
