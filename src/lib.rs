@@ -1,19 +1,36 @@
-use jsonrpc_ws_server::jsonrpc_core::{serde::Serialize, *};
+use jsonrpc_ws_server::jsonrpc_core::*;
 use jsonrpc_ws_server::*;
-use serde::Deserialize;
 use serde_json::json;
-use tauri::api::ipc::CallbackFn;
-use tauri::{AppHandle, InvokePayload, InvokeResponder, InvokeResponse, Manager, Runtime, Window};
+use tauri::{
+  http::HeaderMap,
+  ipc::{CallbackFn, InvokeBody, InvokeResponse},
+  webview::InvokeRequest,
+  AppHandle, Manager, Runtime, Url,
+};
 
-#[derive(Serialize, Deserialize)]
+
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::sync::oneshot;
+use tokio::time::timeout;
+
+#[derive(Deserialize)]
 struct InvokeRpcParams {
   window_label: String,
   payload: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct InvokeRpcPayload {
+  pub cmd: String,
+  pub callback: u32,
+  pub error: u32,
+  pub payload: Value,
+  pub invoke_key: String,
+}
+
 #[derive(Serialize, Deserialize)]
 enum RpcResponseStatus {
-  Processing,
   Success,
   Error,
   Invalid,
@@ -25,13 +42,50 @@ struct RpcResult {
   data: Value,
 }
 
+/// Convenience macro for emitting events through AwesomeRpc WebSocket
+/// 
+/// # Examples
+/// 
+/// Emit to all windows:
+/// ```rust,no_run
+/// # use tauri::Manager;
+/// # use serde_json::json;
+/// emit!(app_handle, "event-name", json!({"data": "value"}));
+/// ```
+/// 
+/// Emit to specific window:
+/// ```rust,no_run
+/// # use tauri::Manager;
+/// # use serde_json::json;
+/// emit!(app_handle, "main", "event-name", json!({"data": "value"}));
+/// ```
+#[macro_export]
+macro_rules! emit {
+    // emit!(handle, event, payload) - emit to all windows
+    ($handle:expr, $event:expr, $payload:expr) => {
+        $handle.state::<$crate::AwesomeEmit>()
+            .emit_all($event, $payload)
+    };
+    
+    // emit!(handle, window, event, payload) - emit to specific window
+    ($handle:expr, $window:expr, $event:expr, $payload:expr) => {
+        $handle.state::<$crate::AwesomeEmit>()
+            .emit($window, $event, $payload)
+    };
+}
+
 pub struct AwesomeRpc {
   port: u16,
   allowed_origins: DomainsValidation<Origin>,
+  invoke_timeout: Duration,
 }
 
 impl AwesomeRpc {
   pub fn new(allowed_origins: Vec<&str>) -> Self {
+    Self::with_timeout(allowed_origins, Duration::from_secs(30)) // Default 30 second timeout
+  }
+
+  pub fn with_timeout(allowed_origins: Vec<&str>, invoke_timeout: Duration) -> Self {
     let port = portpicker::pick_unused_port().expect("failed to get unused port for invoke");
     let allowed_origins =
       DomainsValidation::AllowOnly(allowed_origins.iter().map(|i| i.into()).collect());
@@ -39,30 +93,103 @@ impl AwesomeRpc {
     Self {
       port,
       allowed_origins,
+      invoke_timeout,
     }
   }
 
   pub fn start<R: Runtime>(&self, app_handle: AppHandle<R>) {
     let handle = app_handle.clone();
+    let timeout_duration = self.invoke_timeout;
+
+    // Get the first allowed origin
+    let origin_url = match &self.allowed_origins {
+      DomainsValidation::AllowOnly(origins) => {
+        origins.first()
+          .map(|origin| origin.to_string())
+          .expect("No allowed origins configured")
+      },
+      _ => panic!("Invalid allowed origins configuration")
+    };
 
     let mut io = IoHandler::new();
-    io.add_sync_method("invoke", move |params: Params| {
-      let params = params.parse::<InvokeRpcParams>().unwrap();
+    let origin_url_clone = origin_url.to_string();
+    io.add_method("invoke", move |params: Params| {
+        let origin_url = origin_url_clone.clone();
+        let handle = handle.clone();
 
-      if let Some(window) = handle.get_window(params.window_label.as_str()) {
-        let payload = serde_json::from_str::<InvokePayload>(params.payload.as_str()).unwrap();
-        let _ = window.on_message(payload);
+        async move {
+            let params = params.parse::<InvokeRpcParams>().unwrap();
 
-        return Ok(json!(RpcResult {
-          status: RpcResponseStatus::Processing,
-          data: Value::Null
-        }));
+        if let Some(window) = handle.get_webview_window(&params.window_label) {
+          if let Ok(payload) = serde_json::from_str::<InvokeRpcPayload>(&params.payload) {
+
+            let request = InvokeRequest {
+              cmd: payload.cmd,
+              callback: CallbackFn(payload.callback),
+              error: CallbackFn(payload.error),
+              url: Url::parse(&origin_url).expect("Invalid origin URL"),
+              body: InvokeBody::Json(payload.payload),
+              headers: HeaderMap::new(),
+              invoke_key: payload.invoke_key,
+            };
+
+            let (tx, rx) = oneshot::channel();
+
+            window.on_message(
+              request,
+              Box::new(move |_webview, _cmd, response, _callback, _error| {
+                let result = match response {
+                  InvokeResponse::Ok(body) => {
+                    let data = match body {
+                      tauri::ipc::InvokeResponseBody::Json(json_str) => {
+                        serde_json::from_str(&json_str).unwrap_or_else(|_| Value::String(json_str))
+                      },
+                      tauri::ipc::InvokeResponseBody::Raw(bytes) => json!(bytes),
+                    };
+                    RpcResult {
+                      status: RpcResponseStatus::Success,
+                      data,
+                    }
+                  }
+                  InvokeResponse::Err(tauri::ipc::InvokeError(e)) => {
+                    RpcResult {
+                      status: RpcResponseStatus::Error,
+                      data: json!(e),
+                    }
+                  }
+                };
+
+                let _ = tx.send(result);
+              }),
+            );
+
+            // Wait for the response with timeout
+            let result = match timeout(timeout_duration, rx).await {
+              Ok(Ok(result)) => result,
+              Ok(Err(_)) => RpcResult {
+                status: RpcResponseStatus::Error,
+                data: Value::String("Failed to receive response".into()),
+              },
+              Err(_) => RpcResult {
+                status: RpcResponseStatus::Error,
+                data: Value::String(format!("Request timed out after {:?}", timeout_duration)),
+              }
+            };
+
+            Ok(json!(result))
+          } else {
+            Ok(json!(RpcResult {
+              status: RpcResponseStatus::Invalid,
+              data: Value::String("Invalid payload format".into()),
+            }))
+          }
+        } else {
+          Ok(json!(RpcResult {
+            status: RpcResponseStatus::Invalid,
+            data: Value::String("Window not found".into()),
+          }))
+        }
       }
-
-      Ok(json!(RpcResult {
-        status: RpcResponseStatus::Invalid,
-        data: Value::String("Malformed request".into())
-      }))
     });
 
     let server = ServerBuilder::new(io)
@@ -75,114 +202,9 @@ impl AwesomeRpc {
     tauri::async_runtime::spawn(async { server.wait().unwrap() });
   }
 
-  pub fn responder<R: Runtime>() -> Box<InvokeResponder<R>> {
-    let responder = move |window: Window<R>,
-                          response: InvokeResponse,
-                          callback: CallbackFn,
-                          error: CallbackFn| {
-      let response = response.into_result();
-
-      #[derive(Serialize, Deserialize)]
-      struct JsonRpcResponse {
-        jsonrpc: String,
-        id: usize,
-        result: RpcResult,
-      }
-
-      let result = match response {
-        Ok(r) => RpcResult {
-          status: RpcResponseStatus::Success,
-          data: r,
-        },
-        Err(e) => RpcResult {
-          status: RpcResponseStatus::Error,
-          data: e,
-        },
-      };
-
-      let r = JsonRpcResponse {
-        jsonrpc: "2.0".into(),
-        id: callback.0 + error.0,
-        result,
-      };
-
-      window.state::<AwesomeEmit>().send(r);
-    };
-
-    Box::new(responder)
-  }
-
   pub fn initialization_script(&self) -> String {
-    format!(
-      "
-      Object.defineProperty(window, '__TAURI_POST_MESSAGE__', {{
-        value: (message) => {{
-          const ws = new WebSocket('ws://localhost:{}', \"json\");
-          const rpcMethodId = message.callback + message.error;
-
-          ws.onmessage = function (event) {{
-            let rpcMessage = JSON.parse(event.data);
-
-            if (rpcMessage.id === rpcMethodId) {{
-              if ([\"Invalid\", \"Error\"].includes(rpcMessage.result.status)) {{
-                window[`_${{message.error}}`](rpcMessage.result.data);
-                delete window[`_${{message.error}}`];
-                ws.close();
-              }}
-
-              if (rpcMessage.result.status === \"Success\") {{
-                window[`_${{message.callback}}`](rpcMessage.result.data);
-                delete window[`_${{message.callback}}`];
-                ws.close();
-              }}
-            }}
-          }};
-
-        ws.onerror = (e) => {{
-          ws.close();
-          window[`_${{message.error}}`](e)
-          delete window[`_${{message.error}}`];
-        }};
-
-
-        ws.onopen = () => {{
-          ws.send(
-            JSON.stringify({{
-              jsonrpc: \"2.0\",
-              id: rpcMethodId,
-              method: \"invoke\",
-              params: {{window_label: window.__TAURI_METADATA__.__currentWindow.label, payload: JSON.stringify(message) }},
-            }})
-          );
-        }};
-
-        }}
-      }});
-
-
-      Object.defineProperty(window, 'AwesomeEvent', {{
-        value: {{
-          listen: (event_name, callback) => {{
-            const ws = new WebSocket('ws://localhost:{}', \"json\");
-            ws.onmessage = function (event) {{
-              let message = JSON.parse(event.data);
-
-              if (message.event_name && message.event_name === event_name && [null, window.__TAURI_METADATA__.__currentWindow.label].includes(message.window_label)) {{
-                callback(message.payload);
-              }}
-            }};
-
-            ws.onerror = (e) => {{
-              ws.close();
-            }};
-
-            return () => ws.close();
-          }}
-        }}
-      }})
-    ",
-      self.port, self.port
-    )
+    include_str!("invoke_system.js")
+      .replace("${AWESOME_RPC_PORT}", &self.port.to_string())
   }
 }
 

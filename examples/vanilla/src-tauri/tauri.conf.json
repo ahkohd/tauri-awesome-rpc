@@ -1,59 +1,18 @@
 {
-  "package": {
-    "productName": "app",
-    "version": "0.1.0"
-  },
+  "identifier": "com.tauri.awesome.rpc",
+  "productName": "tauri-awesome-rpc-example",
+  "version": "0.1.0",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "tauri": {
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.tauri.invoke_http",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "resources": [],
-      "externalBin": [],
-      "copyright": "",
-      "category": "DeveloperTool",
-      "shortDescription": "",
-      "longDescription": "",
-      "deb": {
-        "depends": []
-      },
-      "macOS": {
-        "frameworks": [],
-        "minimumSystemVersion": "",
-        "exceptionDomain": "",
-        "signingIdentity": null,
-        "entitlements": null
-      },
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
-      }
-    },
-    "updater": {
-      "active": false
-    },
-    "allowlist": {
-      "all": false
-    },
+  "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
-        "label": "main",
-        "title": "app",
+        "title": "Tauri Awesome RPC Example",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -61,7 +20,24 @@
       }
     ],
     "security": {
-      "csp": "ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'"
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ws://localhost:* http://localhost:* https://localhost:*",
+        "script-src": "'self' 'unsafe-eval' 'unsafe-inline'",
+        "style-src": "'self' 'unsafe-inline'"
+      }
     }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool"
   }
 }
