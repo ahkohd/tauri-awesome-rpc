@@ -8,7 +8,6 @@ use tauri::{
   AppHandle, Manager, Runtime, Url,
 };
 
-
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::oneshot;
@@ -61,17 +60,19 @@ struct RpcResult {
 /// ```
 #[macro_export]
 macro_rules! emit {
-    // emit!(handle, event, payload) - emit to all windows
-    ($handle:expr, $event:expr, $payload:expr) => {
-        $handle.state::<$crate::AwesomeEmit>()
-            .emit_all($event, $payload)
-    };
+  // emit!(handle, event, payload) - emit to all windows
+  ($handle:expr, $event:expr, $payload:expr) => {
+    $handle
+      .state::<$crate::AwesomeEmitter>()
+      .emit_all($event, $payload)
+  };
 
-    // emit!(handle, window, event, payload) - emit to specific window
-    ($handle:expr, $window:expr, $event:expr, $payload:expr) => {
-        $handle.state::<$crate::AwesomeEmit>()
-            .emit($window, $event, $payload)
-    };
+  // emit!(handle, window, event, payload) - emit to specific window
+  ($handle:expr, $window:expr, $event:expr, $payload:expr) => {
+    $handle
+      .state::<$crate::AwesomeEmitter>()
+      .emit($window, $event, $payload)
+  };
 }
 
 /// Convenience macro for listening to events through AwesomeRpc WebSocket
@@ -87,10 +88,11 @@ macro_rules! emit {
 /// ```
 #[macro_export]
 macro_rules! listen {
-    ($handle:expr, $event:expr, $handler:expr) => {
-        $handle.state::<$crate::AwesomeEmit>()
-            .listen($event, $handler)
-    };
+  ($handle:expr, $event:expr, $handler:expr) => {
+    $handle
+      .state::<$crate::AwesomeListener>()
+      .listen($event, $handler)
+  };
 }
 
 /// Convenience macro for listening to events once through AwesomeRpc WebSocket
@@ -105,10 +107,11 @@ macro_rules! listen {
 /// ```
 #[macro_export]
 macro_rules! once {
-    ($handle:expr, $event:expr, $handler:expr) => {
-        $handle.state::<$crate::AwesomeEmit>()
-            .once($event, $handler)
-    };
+  ($handle:expr, $event:expr, $handler:expr) => {
+    $handle
+      .state::<$crate::AwesomeListener>()
+      .once($event, $handler)
+  };
 }
 
 pub struct AwesomeRpc {
@@ -140,26 +143,24 @@ impl AwesomeRpc {
 
     // Get the first allowed origin
     let origin_url = match &self.allowed_origins {
-      DomainsValidation::AllowOnly(origins) => {
-        origins.first()
-          .map(|origin| origin.to_string())
-          .expect("No allowed origins configured")
-      },
-      _ => panic!("Invalid allowed origins configuration")
+      DomainsValidation::AllowOnly(origins) => origins
+        .first()
+        .map(|origin| origin.to_string())
+        .expect("No allowed origins configured"),
+      _ => panic!("Invalid allowed origins configuration"),
     };
 
     let mut io = IoHandler::new();
     let origin_url_clone = origin_url.to_string();
     io.add_method("invoke", move |params: Params| {
-        let origin_url = origin_url_clone.clone();
-        let handle = handle.clone();
+      let origin_url = origin_url_clone.clone();
+      let handle = handle.clone();
 
-        async move {
-            let params = params.parse::<InvokeRpcParams>().unwrap();
+      async move {
+        let params = params.parse::<InvokeRpcParams>().unwrap();
 
         if let Some(window) = handle.get_webview_window(&params.window_label) {
           if let Ok(payload) = serde_json::from_str::<InvokeRpcPayload>(&params.payload) {
-
             let request = InvokeRequest {
               cmd: payload.cmd,
               callback: CallbackFn(payload.callback),
@@ -180,7 +181,7 @@ impl AwesomeRpc {
                     let data = match body {
                       tauri::ipc::InvokeResponseBody::Json(json_str) => {
                         serde_json::from_str(&json_str).unwrap_or_else(|_| Value::String(json_str))
-                      },
+                      }
                       tauri::ipc::InvokeResponseBody::Raw(bytes) => json!(bytes),
                     };
                     RpcResult {
@@ -188,12 +189,10 @@ impl AwesomeRpc {
                       data,
                     }
                   }
-                  InvokeResponse::Err(tauri::ipc::InvokeError(e)) => {
-                    RpcResult {
-                      status: RpcResponseStatus::Error,
-                      data: json!(e),
-                    }
-                  }
+                  InvokeResponse::Err(tauri::ipc::InvokeError(e)) => RpcResult {
+                    status: RpcResponseStatus::Error,
+                    data: json!(e),
+                  },
                 };
 
                 let _ = tx.send(result);
@@ -210,7 +209,7 @@ impl AwesomeRpc {
               Err(_) => RpcResult {
                 status: RpcResponseStatus::Error,
                 data: Value::String(format!("Request timed out after {:?}", timeout_duration)),
-              }
+              },
             };
 
             Ok(json!(result))
@@ -234,14 +233,18 @@ impl AwesomeRpc {
       .start(&format!("0.0.0.0:{}", self.port).as_str().parse().unwrap())
       .expect("RPC server must start with no issues");
 
-    app_handle.manage(AwesomeEmit::new(server.broadcaster()));
+    // Create event bus for backend communication
+    let (event_bus, _) = broadcast::channel(1000);
+
+    // Manage both emitter and listener
+    app_handle.manage(AwesomeEmitter::new(server.broadcaster(), event_bus.clone()));
+    app_handle.manage(AwesomeListener::new(event_bus));
 
     tauri::async_runtime::spawn(async { server.wait().unwrap() });
   }
 
   pub fn initialization_script(&self) -> String {
-    include_str!("invoke_system.js")
-      .replace("${AWESOME_RPC_PORT}", &self.port.to_string())
+    include_str!("invoke_system.js").replace("${AWESOME_RPC_PORT}", &self.port.to_string())
   }
 }
 
@@ -255,25 +258,37 @@ struct AwesomeEvent<P> {
 use tokio::sync::broadcast;
 
 #[derive(Clone)]
-pub struct AwesomeEmit {
+pub struct AwesomeEmitter {
   broadcaster: Broadcaster,
   event_bus: broadcast::Sender<(String, Value)>,
 }
 
-impl AwesomeEmit {
-  pub fn new(broadcaster: Broadcaster) -> Self {
-    let (event_bus, _) = broadcast::channel(1000); // Buffer up to 1000 events
-    Self { broadcaster, event_bus }
+impl AwesomeEmitter {
+  pub fn new(broadcaster: Broadcaster, event_bus: broadcast::Sender<(String, Value)>) -> Self {
+    Self {
+      broadcaster,
+      event_bus,
+    }
   }
 
-  pub fn send<P: Serialize>(&self, payload: P) {
+  pub fn emit<P: Serialize>(&self, window_label: &str, name: &str, payload: P) {
+    let event = AwesomeEvent {
+      event_name: name.into(),
+      window_label: Some(window_label.into()),
+      payload,
+    };
+
+    // Send to WebSocket clients
     self
       .broadcaster
-      .send(serde_json::to_string(&payload).unwrap())
+      .send(serde_json::to_string(&event).unwrap())
       .unwrap();
+
+    // Send to internal event bus
+    let value = serde_json::to_value(&event.payload).unwrap();
+    let _ = self.event_bus.send((name.to_string(), value));
   }
 
-  #[allow(dead_code)]
   pub fn emit_all<P: Serialize>(&self, name: &str, payload: P) {
     let event = AwesomeEvent {
       event_name: name.into(),
@@ -291,24 +306,16 @@ impl AwesomeEmit {
     let value = serde_json::to_value(&event.payload).unwrap();
     let _ = self.event_bus.send((name.to_string(), value));
   }
+}
 
-  #[allow(dead_code)]
-  pub fn emit<P: Serialize>(&self, window_label: &str, name: &str, payload: P) {
-    let event = AwesomeEvent {
-      event_name: name.into(),
-      window_label: Some(window_label.into()),
-      payload,
-    };
+#[derive(Clone)]
+pub struct AwesomeListener {
+  event_bus: broadcast::Sender<(String, Value)>,
+}
 
-    // Send to WebSocket clients
-    self
-      .broadcaster
-      .send(serde_json::to_string(&event).unwrap())
-      .unwrap();
-
-    // Send to internal event bus
-    let value = serde_json::to_value(&event.payload).unwrap();
-    let _ = self.event_bus.send((name.to_string(), value));
+impl AwesomeListener {
+  pub fn new(event_bus: broadcast::Sender<(String, Value)>) -> Self {
+    Self { event_bus }
   }
 
   /// Listen to events on the backend
@@ -368,5 +375,89 @@ impl AwesomeEmit {
     move || {
       handle.abort();
     }
+  }
+}
+
+// Extension trait that shadows Tauri's emit methods
+pub trait EmitterExt<R: Runtime> {
+  fn emit<S: Serialize + Clone>(&self, event: &str, payload: S);
+  fn emit_to<S: Serialize + Clone>(
+    &self,
+    window: &str,
+    event: &str,
+    payload: S,
+  );
+}
+
+impl<R: Runtime> EmitterExt<R> for tauri::AppHandle<R> {
+  fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) {
+    self.state::<AwesomeEmitter>().emit_all(event, payload);
+  }
+
+  fn emit_to<S: Serialize + Clone>(
+    &self,
+    window: &str,
+    event: &str,
+    payload: S,
+  ) {
+    self.state::<AwesomeEmitter>().emit(window, event, payload);
+  }
+}
+
+impl<R: Runtime> EmitterExt<R> for tauri::Window<R> {
+  fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) {
+    self.state::<AwesomeEmitter>().emit_all(event, payload);
+  }
+
+  fn emit_to<S: Serialize + Clone>(
+    &self,
+    window: &str,
+    event: &str,
+    payload: S,
+  ) {
+    self.state::<AwesomeEmitter>().emit(window, event, payload);
+  }
+}
+
+// Extension trait for listening to events
+pub trait ListenerExt<R: Runtime> {
+  fn listen<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: Fn(Value) + Send + Sync + 'static;
+
+  fn once<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: FnOnce(Value) + Send + Sync + 'static;
+}
+
+impl<R: Runtime> ListenerExt<R> for tauri::AppHandle<R> {
+  fn listen<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: Fn(Value) + Send + Sync + 'static,
+  {
+    self.state::<AwesomeListener>().listen(event, handler)
+  }
+
+  fn once<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: FnOnce(Value) + Send + Sync + 'static,
+  {
+    self.state::<AwesomeListener>().once(event, handler)
+  }
+}
+
+impl<R: Runtime> ListenerExt<R> for tauri::Window<R> {
+  fn listen<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: Fn(Value) + Send + Sync + 'static,
+  {
+    self.state::<AwesomeListener>().listen(event, handler)
+  }
+
+  fn once<F>(&self, event: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: FnOnce(Value) + Send + Sync + 'static,
+  {
+    self.state::<AwesomeListener>().once(event, handler)
   }
 }

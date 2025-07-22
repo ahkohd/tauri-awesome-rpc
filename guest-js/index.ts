@@ -1,14 +1,14 @@
 /**
  * Tauri Awesome RPC Guest JS API
  * 
- * Provides TypeScript bindings for the AwesomeEvent system
+ * Provides TypeScript bindings for the AwesomeListener system
  */
 
 interface AwesomeEventListener {
   (data: any): void;
 }
 
-interface AwesomeEventAPI {
+interface AwesomeListenerAPI {
   /**
    * Listen to events emitted from the Rust backend
    * @param eventName The name of the event to listen for
@@ -28,22 +28,22 @@ interface AwesomeEventAPI {
 
 declare global {
   interface Window {
-    AwesomeEvent: AwesomeEventAPI;
+    AwesomeListener: AwesomeListenerAPI;
   }
 }
 
 /**
- * Listen to an event emitted from the Rust backend using AwesomeEmit
+ * Listen to an event emitted from the Rust backend
  * @param eventName The name of the event to listen for
  * @param callback Function to call when the event is received
  * @returns A function to unsubscribe from the event
  */
 export function listen(eventName: string, callback: AwesomeEventListener): () => void {
-  if (!window.AwesomeEvent) {
-    throw new Error('AwesomeEvent is not initialized. Make sure tauri-awesome-rpc is properly configured.');
+  if (!window.AwesomeListener) {
+    throw new Error('AwesomeListener is not initialized. Make sure tauri-awesome-rpc is properly configured.');
   }
   
-  return window.AwesomeEvent.listen(eventName, callback);
+  return window.AwesomeListener.listen(eventName, callback);
 }
 
 /**
@@ -53,19 +53,19 @@ export function listen(eventName: string, callback: AwesomeEventListener): () =>
  * @returns A function to unsubscribe from the event
  */
 export function once(eventName: string, callback: AwesomeEventListener): () => void {
-  if (!window.AwesomeEvent) {
-    throw new Error('AwesomeEvent is not initialized. Make sure tauri-awesome-rpc is properly configured.');
+  if (!window.AwesomeListener) {
+    throw new Error('AwesomeListener is not initialized. Make sure tauri-awesome-rpc is properly configured.');
   }
   
-  return window.AwesomeEvent.once(eventName, callback);
+  return window.AwesomeListener.once(eventName, callback);
 }
 
 /**
- * Check if AwesomeEvent is available
- * @returns true if AwesomeEvent is initialized
+ * Check if AwesomeListener is available
+ * @returns true if AwesomeListener is initialized
  */
 export function isAvailable(): boolean {
-  return typeof window !== 'undefined' && window.AwesomeEvent !== undefined;
+  return typeof window !== 'undefined' && window.AwesomeListener !== undefined;
 }
 
-export type { AwesomeEventListener, AwesomeEventAPI };
+export type { AwesomeEventListener, AwesomeListenerAPI };

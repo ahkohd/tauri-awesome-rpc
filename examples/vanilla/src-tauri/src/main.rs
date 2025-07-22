@@ -5,12 +5,19 @@
 
 use serde_json::json;
 use tauri::{Manager, WebviewWindow};
-use tauri_awesome_rpc::{AwesomeRpc, emit, listen, once};
+use tauri_awesome_rpc::{AwesomeRpc, EmitterExt, ListenerExt, emit, listen, once};
 
 #[tauri::command]
 fn test_command(args: u64) -> Result<String, ()> {
   println!("executed command with args {:?}", args);
   Ok("executed".into())
+}
+
+#[tauri::command]
+fn emit_event_example(app: tauri::AppHandle, message: String) -> Result<(), String> {
+  // Using the EmitterExt trait - looks just like Tauri's emit!
+  app.emit("custom-event", json!({ "message": message }));
+  Ok(())
 }
 
 #[tauri::command]
@@ -58,9 +65,24 @@ fn main() {
           println!("Time elapsed: {:?}", payload);
       });
 
+      // Example of using EmitterExt trait methods
+      // This looks just like Tauri's built-in emit!
+      handle.emit("app-started", json!({"timestamp": std::time::SystemTime::now()}));
+      handle.emit_to("main", "window-specific", json!({"message": "Hello main window"}));
+
+      // Example of using ListenerExt trait methods
+      // Direct method calls instead of macros
+      let _unlisten_ext = handle.listen("config-changed", |payload| {
+          println!("Config changed via extension trait: {:?}", payload);
+      });
+      
+      let _unlisten_once_ext = handle.once("first-user-action", |payload| {
+          println!("First user action via extension trait: {:?}", payload);
+      });
+
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![test_command, report_time_elapsed])
+    .invoke_handler(tauri::generate_handler![test_command, emit_event_example, report_time_elapsed])
     .run(tauri::generate_context!())
     .expect("error while running tauri application")
 }

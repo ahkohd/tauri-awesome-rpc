@@ -1,34 +1,32 @@
 # tauri-awesome-rpc
 
-A crate that provides a custom invoke system for Tauri v2 using a localhost JSON-RPC WebSocket. Each message is delivered through WebSocket using the JSON-RPC 2.0 [specification](https://www.jsonrpc.org/specification).
+A custom invoke system for Tauri v2 that replaces the default IPC with a WebSocket-based RPC system following the JSON-RPC 2.0 [specification](https://www.jsonrpc.org/specification).
 
 ## Features
 
-- **JSON-RPC 2.0 over WebSocket** - Full compatibility with the JSON-RPC 2.0 specification
-- **Single Persistent Connection** - Efficient connection management with automatic reconnection
-- **Request Multiplexing** - Multiple concurrent requests over a single WebSocket connection
-- **Async Support** - Non-blocking request handling with configurable timeouts
+- **🚀 JSON-RPC 2.0 over WebSocket** - Full spec compliance with request/response correlation
+- **🔌 Single Persistent Connection** - Efficient connection management with automatic reconnection
+- **📡 Request Multiplexing** - Multiple concurrent requests over one WebSocket connection  
+- **⚡ Event System** - Alternative event API with both continuous and one-time listeners
+- **🎯 Backend Event Listening** - Rust-side event subscriptions with convenient macros
+- **⏱️ Configurable Timeouts** - Per-instance timeout configuration
 
-**Note: This version is compatible with Tauri v2.**
+## Installation
 
-## Example
+Add to your `src-tauri/Cargo.toml`:
 
-Check out the [example](./examples/vanilla) for a complete working demo.
-
-## Usage
-
-First, add the dependency to your `src-tauri/Cargo.toml` file:
-
-```
+```toml
 [dependencies]
 tauri-awesome-rpc = { git = "https://github.com/ahkohd/tauri-awesome-rpc", branch = "v2" }
 ```
 
-Then, setup the Websocket JSON RPC invoke system on the `main.rs` file:
+## Quick Start
+
+### 1. Backend Setup
 
 ```rust
-use tauri::{Manager, WebviewWindow};
-use tauri_awesome_rpc::{AwesomeEmit, AwesomeRpc, emit};
+use tauri::Manager;
+use tauri_awesome_rpc::{AwesomeRpc, EmitterExt, ListenerExt};
 use serde_json::json;
 
 fn main() {
@@ -38,278 +36,235 @@ fn main() {
     vec!["tauri://localhost"]
   };
 
-  // Create with default 30 second timeout
   let awesome_rpc = AwesomeRpc::new(allowed_origins);
-  
-  // Or create with custom timeout
-  // use std::time::Duration;
-  // let awesome_rpc = AwesomeRpc::with_timeout(allowed_origins, Duration::from_secs(60));
 
   tauri::Builder::default()
     .invoke_system(awesome_rpc.initialization_script())
     .setup(move |app| {
       awesome_rpc.start(app.handle().clone());
+      
+      // Optional: Setup backend event listeners
+      let handle = app.handle();
+      
+      let _unlisten = handle.listen("user-action", |payload| {
+        println!("User action: {:?}", payload);
+      });
+      
+      // Emit an event
+      handle.emit("app-ready", json!({"version": "1.0.0"}));
+      
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![test_command, report_time_elapsed])
+    .invoke_handler(tauri::generate_handler![my_command])
     .run(tauri::generate_context!())
     .expect("error while running tauri application")
 }
 
 #[tauri::command]
-fn test_command(args: u64) -> Result<String, ()> {
-  println!("executed command with args {:?}", args);
-  Ok("executed".into())
-}
-
-#[tauri::command]
-fn report_time_elapsed(window: WebviewWindow) {
-  tauri::async_runtime::spawn(async move {
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(250));
-    let start_time = std::time::Instant::now();
-
-    loop {
-      interval.tick().await;
-
-      // IMPORTANT: Use AwesomeEmit to send events through WebSocket
-      // Do NOT use window.emit() - that uses Tauri's built-in event system
-      
-      // Using the macro (recommended)
-      emit!(window, "main", "time_elapsed", json!(start_time.elapsed()));
-      
-      // Or using the verbose method
-      // window
-      //   .state::<AwesomeEmit>()
-      //   .emit("main", "time_elapsed", json!(start_time.elapsed()));
-    }
-  });
+fn my_command(name: String) -> String {
+  format!("Hello, {}!", name)
 }
 ```
 
-Then, on the frontend:
+### 2. Frontend Setup
 
-```html
-<html>
-  <body>
-    <div>
-      <h1>tauri-awesome-rpc</h1>
-
-      <h5>invoke test</h5>
-      <div id="response"></div>
-
-      <h5>AwesomeEvent.listen test</h5>
-      <div id="time_elapsed"></div>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-</html>
-```
-
-- Use your Tauri `invoke` method as usual.
-- Use `window.AwesomeEvent` to listen to the events emitted using `AwesomeEmit` from the Rust backend.
-
-```ts
-import { invoke } from "@tauri-apps/api/tauri";
-
-const response = document.getElementById("response") as HTMLDivElement;
-const timeElapsed = document.getElementById("time_elapsed") as HTMLDivElement;
-
-invoke("test_command", { args: 5 })
-  .then((data) => {
-    response.innerText = data as string;
-  })
-  .catch(console.error);
-
-invoke("report_time_elapsed");
-
-// Listen to events continuously
-const unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
-  timeElapsed.innerText = JSON.stringify(data);
-});
-
-// Listen to an event only once
-window.AwesomeEvent.once("app_ready", (data) => {
-  console.log("App is ready:", data);
-});
-
-// Later: unsubscribe from continuous listener
-// unsubscribe();
-```
-
-Add the following type definition to your project's `global.d.ts` file:
+Add TypeScript types to your `global.d.ts`:
 
 ```typescript
 interface Window {
-  AwesomeEvent: {
+  AwesomeListener: {
     listen(eventName: string, callback: (data: any) => void): () => void;
     once(eventName: string, callback: (data: any) => void): () => void;
   };
 }
 ```
 
-### Using the TypeScript API
-
-Alternatively, you can use the provided TypeScript API from the [`guest-js`](./guest-js/) folder:
+Use in your frontend code:
 
 ```typescript
-import { listen, once } from '@tauri-awesome-rpc/api';
+import { invoke } from "@tauri-apps/api/tauri";
 
-// Listen continuously
-const unlisten = listen('time_elapsed', (data) => {
-  console.log('Time elapsed:', data);
+// Regular Tauri invoke - automatically uses WebSocket
+const result = await invoke('my_command', { name: 'World' });
+
+// Listen to backend events
+const unlisten = window.AwesomeListener.listen('backend-event', (data) => {
+  console.log('Received:', data);
 });
 
-// Listen only once
-once('app_ready', (data) => {
-  console.log('App ready event received once:', data);
-});
-```
-
-## How It Works
-
-1. **WebSocket Server**: A JSON-RPC WebSocket server runs on a dynamically allocated port
-2. **Invoke Interception**: The initialization script intercepts Tauri's `postMessage` calls
-3. **Request/Response Flow**: 
-   - Frontend sends invoke requests via WebSocket as JSON-RPC messages
-   - Rust backend processes the request through Tauri's standard invoke system
-   - Responses are sent back through the same WebSocket connection
-4. **Single Persistent Connection**: All requests and events share one WebSocket connection with automatic reconnection
-
-### Integration with Tauri APIs
-
-When tauri-awesome-rpc is configured, the integration works as follows:
-
-#### Frontend → Backend (Automatic WebSocket)
-All frontend-to-backend communication automatically uses WebSocket:
-
-- **Commands**: `invoke()` calls use WebSocket instead of default IPC
-- **Frontend Events**: `emit()`, `emitTo()` from JavaScript use WebSocket
-- **Plugins**: Any Tauri plugin using the standard invoke system benefits from WebSocket transport
-
-#### Backend → Frontend (Manual Choice Required)
-For backend-to-frontend events, you must explicitly choose:
-
-```rust
-use tauri_awesome_rpc::emit;
-use serde_json::json;
-
-// ❌ This uses Tauri's built-in event system (NOT WebSocket)
-app_handle.emit("my-event", payload)?;
-window.emit("my-event", payload)?;
-
-// ✅ This uses AwesomeRpc's WebSocket system (verbose)
-app_handle.state::<AwesomeEmit>()
-    .emit("window-label", "my-event", payload);
-
-// ✅ This uses AwesomeRpc's WebSocket system (with macro)
-emit!(app_handle, "my-event", payload);                     // Emit to all windows
-emit!(app_handle, "main", "my-event", json!({"foo": 42}));  // Emit to specific window
-```
-
-**Important**: If you want all events to go through WebSocket, you must use `AwesomeEmit` in your Rust code instead of Tauri's built-in `emit()` methods.
-
-#### Frontend Event Listening
-Frontend event listeners work with both systems:
-
-```typescript
-// Frontend → Backend: automatically uses WebSocket
-await invoke('my_command', { name: 'World' });
-await emit('frontend-event', { data: 'Hello' });
-
-// Listening to backend events (both systems work)
-// If backend uses app_handle.emit() - receives via Tauri's system
-// If backend uses AwesomeEmit - receives via WebSocket
-await listen('backend-event', (event) => {
-  console.log('Received:', event.payload);
-});
-
-// AwesomeEvent only receives events sent via AwesomeEmit
-window.AwesomeEvent.listen('websocket-event', (data) => {
-  console.log('Direct WebSocket event:', data);
-});
-```
-
-### AwesomeEvent API
-
-In addition to Tauri's built-in event system, tauri-awesome-rpc provides the `AwesomeEvent` API as an alternative event system:
-
-```typescript
-// AwesomeEvent - alternative event API with one-time listener support
-window.AwesomeEvent.listen('realtime-data', (data) => {
-  console.log('Event received:', data);
-});
-
-// One-time listeners with automatic cleanup
-window.AwesomeEvent.once('app-ready', (data) => {
+// One-time event listener
+window.AwesomeListener.once('app-ready', (data) => {
   console.log('App initialized:', data);
 });
 ```
 
-Use `AwesomeEvent` when you need:
-- A simpler event API without Tauri's event wrapping
-- One-time event listeners with automatic cleanup (`once()`)
-- Direct access to the payload without the Tauri Event wrapper
+## API Reference
 
-### Backend Event Listening
+### Backend APIs
 
-The `AwesomeEmit` struct provides methods for backend code to listen to events. You can use the convenient macros or call the methods directly:
+#### Using Extension Traits (Recommended)
 
 ```rust
-use tauri_awesome_rpc::{listen, once};
+use tauri_awesome_rpc::{EmitterExt, ListenerExt};
+use serde_json::json;
 
-// Using macros (recommended)
-let unlisten = listen!(app_handle, "user-action", |payload| {
-  println!("User action received: {:?}", payload);
+// Emit events - looks just like Tauri's native API!
+app_handle.emit("event-name", json!({"data": "value"}));
+app_handle.emit_to("main", "event-name", json!({"data": "value"}));
+
+// Listen to events
+let unlisten = app_handle.listen("event-name", |payload| {
+  println!("Event received: {:?}", payload);
 });
 
-let unlisten_once = once!(app_handle, "init-complete", |payload| {
-  println!("Initialization complete: {:?}", payload);
+let unlisten = app_handle.once("event-name", |payload| {
+  println!("One-time event: {:?}", payload);
 });
-
-// Or using direct method calls
-let unlisten = app_handle.state::<AwesomeEmit>()
-  .listen("user-action", |payload| {
-    println!("User action received: {:?}", payload);
-  });
-
-let unlisten_once = app_handle.state::<AwesomeEmit>()
-  .once("init-complete", |payload| {
-    println!("Initialization complete: {:?}", payload);
-  });
 
 // Stop listening
-unlisten(); // Call the returned closure to stop listening
+unlisten();
 ```
 
-This is useful for:
-- Internal event-driven architecture
-- Backend components reacting to frontend events
-- Cross-component communication within the Rust backend
+**Note**: If you import both `tauri::Emitter` and `tauri_awesome_rpc::EmitterExt`, you'll get a conflict. Solutions:
+- Use only `EmitterExt` for WebSocket transport
+- Import with aliases: `use tauri::Emitter as TauriEmitter;`
+- Use fully qualified syntax: `EmitterExt::emit(&handle, "event", data)?;`
 
-## Configuration
+#### Using Macros (Alternative)
 
-### Timeout Configuration
+```rust
+use tauri_awesome_rpc::{emit, listen, once};
+use serde_json::json;
 
-You can configure the timeout for invoke requests:
+// Emit events
+emit!(app_handle, "event-name", json!({"data": "value"}));
+emit!(app_handle, "main", "event-name", json!({"data": "value"}));
+
+// Listen to events
+let unlisten = listen!(app_handle, "event-name", |payload| {
+  println!("Event received: {:?}", payload);
+});
+
+let unlisten = once!(app_handle, "event-name", |payload| {
+  println!("One-time event: {:?}", payload);
+});
+```
+
+### Frontend APIs
+
+#### Using TypeScript Module
+
+```typescript
+import { listen, once } from '@tauri-awesome-rpc/api';
+
+const unlisten = listen('event-name', (data) => {
+  console.log('Event:', data);
+});
+
+const unlisten = once('startup-event', (data) => {
+  console.log('Startup:', data);
+});
+```
+
+#### Using Window API
+
+```typescript
+// Continuous listener
+const unlisten = window.AwesomeListener.listen('event-name', (data) => {
+  console.log('Event:', data);
+});
+
+// One-time listener  
+const unlisten = window.AwesomeListener.once('event-name', (data) => {
+  console.log('Once:', data);
+});
+```
+
+## Advanced Configuration
+
+### Custom Timeout
 
 ```rust
 use std::time::Duration;
 
-// Default 30 second timeout
+// Default: 30 seconds
 let awesome_rpc = AwesomeRpc::new(allowed_origins);
 
-// Custom timeout with milliseconds precision
-let awesome_rpc = AwesomeRpc::with_timeout(allowed_origins, Duration::from_millis(5500));
+// Custom timeout
+let awesome_rpc = AwesomeRpc::with_timeout(
+  allowed_origins, 
+  Duration::from_secs(60)
+);
 ```
 
-### Allowed Origins
-
-Configure allowed origins based on your environment:
+### Environment-based Origins
 
 ```rust
 let allowed_origins = if cfg!(dev) {
-  vec!["http://localhost:1420", "http://localhost:5173"]  // Development origins
+  vec![
+    "http://localhost:1420",     // Vite
+    "http://localhost:5173",     // Vite alternative
+    "http://localhost:3000"      // Next.js
+  ]
 } else {
-  vec!["tauri://localhost"] // Production origins
+  vec!["tauri://localhost"]      // Production
 };
 ```
+
+## How It Works
+
+### Architecture
+
+1. **WebSocket Server**: Runs on a dynamically allocated port
+2. **Invoke Interception**: JavaScript `postMessage` calls are redirected to WebSocket
+3. **JSON-RPC Protocol**: All messages follow JSON-RPC 2.0 specification
+4. **Event Bus**: Internal broadcast channel for backend event distribution
+
+### Integration Details
+
+#### Frontend → Backend
+
+All standard Tauri APIs automatically use WebSocket:
+- `invoke()` commands
+- `emit()` / `emitTo()` from JavaScript  
+- Plugin invocations
+
+#### Backend → Frontend
+
+When using awesome-rpc with extension traits:
+
+```rust
+use tauri_awesome_rpc::{EmitterExt, ListenerExt};
+
+// When extension traits are imported, these use WebSocket
+app_handle.emit("event", data);
+app_handle.emit_to("main", "event", data);
+
+let unlisten = app_handle.listen("event", |payload| { 
+  println!("Received: {:?}", payload);
+});
+
+let unlisten_once = app_handle.once("startup", |payload| { 
+  println!("Startup event: {:?}", payload);
+});
+
+// Without importing the extension traits, emit would use Tauri's built-in IPC
+```
+
+## Important Notes
+
+### Event System Behavior
+
+When you import `tauri_awesome_rpc::EmitterExt`:
+- `app_handle.emit()`, `app_handle.emit_to()` uses WebSocket transport
+- `window.emit()`, `window.emit_to()` uses WebSocket transport
+- The API looks identical to Tauri's built-in methods
+
+Without importing the extension trait:
+- `app_handle.emit()`, `app_handle.emit_to()` uses Tauri's standard IPC
+- `window.emit()`, `window.emit_to()` uses Tauri's standard IPC
+- You can still use `emit!` macro for WebSocket transport
+
+## Examples
+
+Check out the [complete example](./examples/vanilla) for a working demo.

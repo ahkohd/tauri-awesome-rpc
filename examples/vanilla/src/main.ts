@@ -7,7 +7,7 @@ const timeElapsed = document.getElementById("time_elapsed") as HTMLDivElement;
 console.log("Checking tauri-awesome-rpc initialization...");
 console.log("window.__TAURI_INTERNALS__:", window.__TAURI_INTERNALS__);
 console.log("window.__TAURI_INTERNALS__.postMessage:", window.__TAURI_INTERNALS__?.postMessage);
-console.log("window.AwesomeEvent:", window.AwesomeEvent);
+console.log("window.AwesomeListener:", window.AwesomeListener);
 
 // Test basic invoke command
 invoke("test_command", { args: 5 })
@@ -25,12 +25,12 @@ invoke("report_time_elapsed")
     console.error("Error invoking report_time_elapsed:", error);
   });
 
-// Listen to time elapsed events using AwesomeEvent
-if (window.AwesomeEvent) {
-  const _unsubscribe = window.AwesomeEvent.listen("time_elapsed", (data) => {
+// Listen to time elapsed events using AwesomeListener
+if (window.AwesomeListener) {
+  const _unsubscribe = window.AwesomeListener.listen("time_elapsed", (data) => {
     timeElapsed.innerText = JSON.stringify(data);
   });
 } else {
-  console.error("AwesomeEvent is not available!");
-  timeElapsed.innerText = "AwesomeEvent not initialized";
+  console.error("AwesomeListener is not available!");
+  timeElapsed.innerText = "AwesomeListener not initialized";
 }

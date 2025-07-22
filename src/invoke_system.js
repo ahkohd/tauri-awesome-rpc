@@ -64,7 +64,6 @@ class WebSocketManager {
 		this.ws = new WebSocket(`ws://localhost:${this.port}`, "json");
 
 		this.ws.onopen = () => {
-			console.log("Awesome RPC WebSocket connected");
 			this.state = 'connected';
 			this.reconnectDelay = 1000; // Reset delay on successful connection
 			
@@ -148,7 +147,6 @@ class WebSocketManager {
 		};
 
 		this.ws.onclose = () => {
-			console.log("Awesome RPC WebSocket disconnected");
 			this.state = 'disconnected';
 			this.ws = null;
 			
@@ -177,7 +175,6 @@ class WebSocketManager {
 		}
 		
 		this.reconnectTimer = setTimeout(() => {
-			console.log(`Attempting to reconnect WebSocket (delay: ${this.reconnectDelay}ms)`);
 			this.connect();
 		}, this.reconnectDelay);
 		
@@ -290,15 +287,13 @@ const wsManager = new WebSocketManager(port);
 		value: sendIpcMessage,
 	});
 
-	// Event system - AwesomeEvent
-	Object.defineProperty(window, 'AwesomeEvent', {
+	// Event system - AwesomeListener
+	Object.defineProperty(window, 'AwesomeListener', {
 		value: {
 			listen: (event_name, callback) => {
-				console.log("Setting up AwesomeEvent listener for:", event_name);
 				return wsManager.addEventListener(event_name, callback, false);
 			},
 			once: (event_name, callback) => {
-				console.log("Setting up AwesomeEvent once listener for:", event_name);
 				return wsManager.addEventListener(event_name, callback, true);
 			}
 		}
