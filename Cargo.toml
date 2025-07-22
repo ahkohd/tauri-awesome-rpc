@@ -18,3 +18,4 @@ serde_json = "1.0"
 jsonrpc-ws-server = "18.0.0"
 serde = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
+tokio = { version = "1", features = ["macros", "sync"] }

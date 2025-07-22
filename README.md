@@ -250,6 +250,42 @@ Use `AwesomeEvent` when you need:
 - One-time event listeners with automatic cleanup (`once()`)
 - Direct access to the payload without the Tauri Event wrapper
 
+### Backend Event Listening
+
+The `AwesomeEmit` struct provides methods for backend code to listen to events. You can use the convenient macros or call the methods directly:
+
+```rust
+use tauri_awesome_rpc::{listen, once};
+
+// Using macros (recommended)
+let unlisten = listen!(app_handle, "user-action", |payload| {
+  println!("User action received: {:?}", payload);
+});
+
+let unlisten_once = once!(app_handle, "init-complete", |payload| {
+  println!("Initialization complete: {:?}", payload);
+});
+
+// Or using direct method calls
+let unlisten = app_handle.state::<AwesomeEmit>()
+  .listen("user-action", |payload| {
+    println!("User action received: {:?}", payload);
+  });
+
+let unlisten_once = app_handle.state::<AwesomeEmit>()
+  .once("init-complete", |payload| {
+    println!("Initialization complete: {:?}", payload);
+  });
+
+// Stop listening
+unlisten(); // Call the returned closure to stop listening
+```
+
+This is useful for:
+- Internal event-driven architecture
+- Backend components reacting to frontend events
+- Cross-component communication within the Rust backend
+
 ## Configuration
 
 ### Timeout Configuration

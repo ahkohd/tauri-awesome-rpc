@@ -43,16 +43,16 @@ struct RpcResult {
 }
 
 /// Convenience macro for emitting events through AwesomeRpc WebSocket
-/// 
+///
 /// # Examples
-/// 
+///
 /// Emit to all windows:
 /// ```rust,no_run
 /// # use tauri::Manager;
 /// # use serde_json::json;
 /// emit!(app_handle, "event-name", json!({"data": "value"}));
 /// ```
-/// 
+///
 /// Emit to specific window:
 /// ```rust,no_run
 /// # use tauri::Manager;
@@ -66,11 +66,48 @@ macro_rules! emit {
         $handle.state::<$crate::AwesomeEmit>()
             .emit_all($event, $payload)
     };
-    
+
     // emit!(handle, window, event, payload) - emit to specific window
     ($handle:expr, $window:expr, $event:expr, $payload:expr) => {
         $handle.state::<$crate::AwesomeEmit>()
             .emit($window, $event, $payload)
+    };
+}
+
+/// Convenience macro for listening to events through AwesomeRpc WebSocket
+///
+/// # Examples
+///
+/// Listen continuously:
+/// ```rust,no_run
+/// # use tauri::Manager;
+/// let unlisten = listen!(app_handle, "event-name", |payload| {
+///     println!("Received: {:?}", payload);
+/// });
+/// ```
+#[macro_export]
+macro_rules! listen {
+    ($handle:expr, $event:expr, $handler:expr) => {
+        $handle.state::<$crate::AwesomeEmit>()
+            .listen($event, $handler)
+    };
+}
+
+/// Convenience macro for listening to events once through AwesomeRpc WebSocket
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use tauri::Manager;
+/// let unlisten = once!(app_handle, "event-name", |payload| {
+///     println!("Received once: {:?}", payload);
+/// });
+/// ```
+#[macro_export]
+macro_rules! once {
+    ($handle:expr, $event:expr, $handler:expr) => {
+        $handle.state::<$crate::AwesomeEmit>()
+            .once($event, $handler)
     };
 }
 
@@ -215,14 +252,18 @@ struct AwesomeEvent<P> {
   payload: P,
 }
 
+use tokio::sync::broadcast;
+
 #[derive(Clone)]
 pub struct AwesomeEmit {
   broadcaster: Broadcaster,
+  event_bus: broadcast::Sender<(String, Value)>,
 }
 
 impl AwesomeEmit {
   pub fn new(broadcaster: Broadcaster) -> Self {
-    Self { broadcaster }
+    let (event_bus, _) = broadcast::channel(1000); // Buffer up to 1000 events
+    Self { broadcaster, event_bus }
   }
 
   pub fn send<P: Serialize>(&self, payload: P) {
@@ -234,31 +275,98 @@ impl AwesomeEmit {
 
   #[allow(dead_code)]
   pub fn emit_all<P: Serialize>(&self, name: &str, payload: P) {
+    let event = AwesomeEvent {
+      event_name: name.into(),
+      window_label: None,
+      payload,
+    };
+
+    // Send to WebSocket clients
     self
       .broadcaster
-      .send(
-        serde_json::to_string(&AwesomeEvent {
-          event_name: name.into(),
-          window_label: None,
-          payload,
-        })
-        .unwrap(),
-      )
+      .send(serde_json::to_string(&event).unwrap())
       .unwrap();
+
+    // Send to internal event bus
+    let value = serde_json::to_value(&event.payload).unwrap();
+    let _ = self.event_bus.send((name.to_string(), value));
   }
 
   #[allow(dead_code)]
   pub fn emit<P: Serialize>(&self, window_label: &str, name: &str, payload: P) {
+    let event = AwesomeEvent {
+      event_name: name.into(),
+      window_label: Some(window_label.into()),
+      payload,
+    };
+
+    // Send to WebSocket clients
     self
       .broadcaster
-      .send(
-        serde_json::to_string(&AwesomeEvent {
-          event_name: name.into(),
-          window_label: Some(window_label.into()),
-          payload,
-        })
-        .unwrap(),
-      )
+      .send(serde_json::to_string(&event).unwrap())
       .unwrap();
+
+    // Send to internal event bus
+    let value = serde_json::to_value(&event.payload).unwrap();
+    let _ = self.event_bus.send((name.to_string(), value));
+  }
+
+  /// Listen to events on the backend
+  /// Returns an unlistener function
+  pub fn listen<F>(&self, event_name: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: Fn(Value) + Send + Sync + 'static,
+  {
+    let event_name = event_name.to_string();
+    let mut rx = self.event_bus.subscribe();
+
+    // Spawn a task to handle events using tauri's async runtime
+    let handle = tauri::async_runtime::spawn(async move {
+      loop {
+        match rx.recv().await {
+          Ok((name, payload)) => {
+            if name == event_name {
+              handler(payload);
+            }
+          }
+          Err(_) => break, // Channel closed
+        }
+      }
+    });
+
+    // Return unlistener that aborts the task
+    move || {
+      handle.abort();
+    }
+  }
+
+  /// Listen to events only once on the backend
+  /// Returns an unlistener function
+  pub fn once<F>(&self, event_name: &str, handler: F) -> impl FnOnce() + Send + Sync + 'static
+  where
+    F: FnOnce(Value) + Send + Sync + 'static,
+  {
+    let event_name = event_name.to_string();
+    let mut rx = self.event_bus.subscribe();
+
+    // Spawn a task to handle the event once using tauri's async runtime
+    let handle = tauri::async_runtime::spawn(async move {
+      loop {
+        match rx.recv().await {
+          Ok((name, payload)) => {
+            if name == event_name {
+              handler(payload);
+              break; // Stop after first event
+            }
+          }
+          Err(_) => break, // Channel closed
+        }
+      }
+    });
+
+    // Return unlistener that aborts the task
+    move || {
+      handle.abort();
+    }
   }
 }
