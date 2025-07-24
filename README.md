@@ -258,12 +258,48 @@ let unlisten_once = app_handle.once("startup", |payload| {
 When you import `tauri_awesome_rpc::EmitterExt`:
 - `app_handle.emit()`, `app_handle.emit_to()` uses WebSocket transport
 - `window.emit()`, `window.emit_to()` uses WebSocket transport
-- The API looks identical to Tauri's built-in methods
 
-Without importing the extension trait:
-- `app_handle.emit()`, `app_handle.emit_to()` uses Tauri's standard IPC
-- `window.emit()`, `window.emit_to()` uses Tauri's standard IPC
-- You can still use `emit!` macro for WebSocket transport
+When you import `tauri_awesome_rpc::ListenerExt`:
+- `app_handle.listen()`, `app_handle.once()` listens to WebSocket events
+- `window.listen()`, `window.once()` listens to WebSocket events
+- These shadow Tauri's built-in event listeners
+
+Without importing the extension traits:
+- `app_handle.emit()` uses Tauri's standard IPC
+- `app_handle.listen()`, `window.listen()` use Tauri's standard event system
+- You can still use macros: `emit!`, `listen!`, `once!` for WebSocket transport
+
+### Command Execution Context
+
+All commands invoked through awesome-rpc run in an async context, not on the main thread. This differs from Tauri's default behavior where sync commands run on the main thread.
+
+**This is actually a benefit!** Running commands async by default:
+- Prevents accidental blocking of the main thread with long-running sync operations
+- Keeps the UI responsive during command execution
+- Makes main thread usage explicit and intentional
+- Makes debugging easier - explicit `run_on_main_thread` calls are easy to find and audit
+
+If you need main thread execution (e.g., for UI operations):
+
+```rust
+#[tauri::command]
+fn my_sync_command(app: tauri::AppHandle) {
+  // This runs async with awesome-rpc
+  
+  // To run on main thread when needed:
+  app.run_on_main_thread(|| {
+    // UI operations or other main-thread-only code
+    println!("Running on main thread!");
+  });
+}
+```
+
+This is particularly important for:
+- Platform-specific UI operations
+- Libraries that require main thread access
+- Code that depends on sync command behavior
+
+The explicit `run_on_main_thread` pattern makes it clear which operations need main thread access, improving code maintainability.
 
 ## Examples
 
