@@ -1,0 +1,62 @@
+warning|:|src/lib.rs|:|378|:|387|:|7|:|8|:|this loop could be written as a `while let` loop|:|[0m[1m[33mwarning[0m[0m[1m: this loop could be written as a `while let` loop[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/lib.rs:378:7[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m378[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m/[0m[0m [0m[0m      loop {[0m
+[0m[1m[38;5;12m379[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m        match rx.recv().await {[0m
+[0m[1m[38;5;12m380[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m          Ok((name, payload)) => {[0m
+[0m[1m[38;5;12m381[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m            if name == event_name {[0m
+[0m[1m[38;5;12m...[0m[0m   [0m[0m[1m[33m|[0m
+[0m[1m[38;5;12m387[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m      }[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|_______^[0m[0m [0m[0m[1m[33mhelp: try: `while let Ok((name, payload)) = rx.recv().await { .. }`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mhelp[0m[0m: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(clippy::while_let_loop)]` on by default[0m
+
+|:|none
+help|:|src/lib.rs|:|378|:|387|:|7|:|8|:|try|:|none|:|while let Ok((name, payload)) = rx.recv().await { .. }
+warning|:|src/lib.rs|:|407|:|417|:|7|:|8|:|this loop could be written as a `while let` loop|:|[0m[1m[33mwarning[0m[0m[1m: this loop could be written as a `while let` loop[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/lib.rs:407:7[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m407[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m/[0m[0m [0m[0m      loop {[0m
+[0m[1m[38;5;12m408[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m        match rx.recv().await {[0m
+[0m[1m[38;5;12m409[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m          Ok((name, payload)) => {[0m
+[0m[1m[38;5;12m410[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m            if name == event_name {[0m
+[0m[1m[38;5;12m...[0m[0m   [0m[0m[1m[33m|[0m
+[0m[1m[38;5;12m417[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m      }[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|_______^[0m[0m [0m[0m[1m[33mhelp: try: `while let Ok((name, payload)) = rx.recv().await { .. }`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mhelp[0m[0m: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop[0m
+
+|:|none
+help|:|src/lib.rs|:|407|:|417|:|7|:|8|:|try|:|none|:|while let Ok((name, payload)) = rx.recv().await { .. }
+warning|:|src/lib.rs|:|378|:|387|:|7|:|8|:|this loop could be written as a `while let` loop|:|[0m[1m[33mwarning[0m[0m[1m: this loop could be written as a `while let` loop[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/lib.rs:378:7[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m378[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m/[0m[0m [0m[0m      loop {[0m
+[0m[1m[38;5;12m379[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m        match rx.recv().await {[0m
+[0m[1m[38;5;12m380[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m          Ok((name, payload)) => {[0m
+[0m[1m[38;5;12m381[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m            if name == event_name {[0m
+[0m[1m[38;5;12m...[0m[0m   [0m[0m[1m[33m|[0m
+[0m[1m[38;5;12m387[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m      }[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|_______^[0m[0m [0m[0m[1m[33mhelp: try: `while let Ok((name, payload)) = rx.recv().await { .. }`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mhelp[0m[0m: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(clippy::while_let_loop)]` on by default[0m
+
+|:|none
+help|:|src/lib.rs|:|378|:|387|:|7|:|8|:|try|:|none|:|while let Ok((name, payload)) = rx.recv().await { .. }
+warning|:|src/lib.rs|:|407|:|417|:|7|:|8|:|this loop could be written as a `while let` loop|:|[0m[1m[33mwarning[0m[0m[1m: this loop could be written as a `while let` loop[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/lib.rs:407:7[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m407[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m/[0m[0m [0m[0m      loop {[0m
+[0m[1m[38;5;12m408[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m        match rx.recv().await {[0m
+[0m[1m[38;5;12m409[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m          Ok((name, payload)) => {[0m
+[0m[1m[38;5;12m410[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m            if name == event_name {[0m
+[0m[1m[38;5;12m...[0m[0m   [0m[0m[1m[33m|[0m
+[0m[1m[38;5;12m417[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|[0m[0m [0m[0m      }[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[33m|_______^[0m[0m [0m[0m[1m[33mhelp: try: `while let Ok((name, payload)) = rx.recv().await { .. }`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mhelp[0m[0m: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop[0m
+
+|:|none
+help|:|src/lib.rs|:|407|:|417|:|7|:|8|:|try|:|none|:|while let Ok((name, payload)) = rx.recv().await { .. }

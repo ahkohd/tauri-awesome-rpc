@@ -197,6 +197,23 @@ let awesome_rpc = AwesomeRpc::with_timeout(
 );
 ```
 
+### WebSocket Buffer Configuration
+
+Configure WebSocket buffer capacities to handle large payloads:
+
+```rust
+let awesome_rpc = AwesomeRpc::new(allowed_origins)
+  .max_connections(1000)                      // Default: 100
+  .max_payload(50 * 1024 * 1024)             // Default: 10MB
+  .max_in_buffer_capacity(100 * 1024 * 1024)  // Default: 10MB
+  .max_out_buffer_capacity(100 * 1024 * 1024); // Default: 10MB
+```
+
+This is particularly useful when:
+- Reading large files through the RPC system
+- Handling high-volume data transfers
+- Supporting many concurrent connections
+
 ### Environment-based Origins
 
 ```rust

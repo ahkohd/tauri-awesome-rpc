@@ -118,6 +118,10 @@ pub struct AwesomeRpc {
   port: u16,
   allowed_origins: DomainsValidation<Origin>,
   invoke_timeout: Duration,
+  max_connections: Option<usize>,
+  max_payload: Option<usize>,
+  max_in_buffer_capacity: Option<usize>,
+  max_out_buffer_capacity: Option<usize>,
 }
 
 impl AwesomeRpc {
@@ -134,7 +138,31 @@ impl AwesomeRpc {
       port,
       allowed_origins,
       invoke_timeout,
+      max_connections: None,
+      max_payload: None,
+      max_in_buffer_capacity: None,
+      max_out_buffer_capacity: None,
     }
+  }
+
+  pub fn max_connections(mut self, max_connections: usize) -> Self {
+    self.max_connections = Some(max_connections);
+    self
+  }
+
+  pub fn max_payload(mut self, max_payload: usize) -> Self {
+    self.max_payload = Some(max_payload);
+    self
+  }
+
+  pub fn max_in_buffer_capacity(mut self, max_in_buffer_capacity: usize) -> Self {
+    self.max_in_buffer_capacity = Some(max_in_buffer_capacity);
+    self
+  }
+
+  pub fn max_out_buffer_capacity(mut self, max_out_buffer_capacity: usize) -> Self {
+    self.max_out_buffer_capacity = Some(max_out_buffer_capacity);
+    self
   }
 
   pub fn start<R: Runtime>(&self, app_handle: AppHandle<R>) {
@@ -180,7 +208,7 @@ impl AwesomeRpc {
                   InvokeResponse::Ok(body) => {
                     let data = match body {
                       tauri::ipc::InvokeResponseBody::Json(json_str) => {
-                        serde_json::from_str(&json_str).unwrap_or_else(|_| Value::String(json_str))
+                        serde_json::from_str(&json_str).unwrap_or(Value::String(json_str))
                       }
                       tauri::ipc::InvokeResponseBody::Raw(bytes) => json!(bytes),
                     };
@@ -228,8 +256,26 @@ impl AwesomeRpc {
       }
     });
 
-    let server = ServerBuilder::new(io)
-      .allowed_origins(self.allowed_origins.clone())
+    let mut server_builder = ServerBuilder::new(io)
+      .allowed_origins(self.allowed_origins.clone());
+
+    if let Some(max_connections) = self.max_connections {
+      server_builder = server_builder.max_connections(max_connections);
+    }
+
+    if let Some(max_payload) = self.max_payload {
+      server_builder = server_builder.max_payload(max_payload);
+    }
+
+    if let Some(max_in_buffer_capacity) = self.max_in_buffer_capacity {
+      server_builder = server_builder.max_in_buffer_capacity(max_in_buffer_capacity);
+    }
+
+    if let Some(max_out_buffer_capacity) = self.max_out_buffer_capacity {
+      server_builder = server_builder.max_out_buffer_capacity(max_out_buffer_capacity);
+    }
+
+    let server = server_builder
       .start(&format!("0.0.0.0:{}", self.port).as_str().parse().unwrap())
       .expect("RPC server must start with no issues");
 
@@ -381,12 +427,7 @@ impl AwesomeListener {
 // Extension trait that shadows Tauri's emit methods
 pub trait EmitterExt<R: Runtime> {
   fn emit<S: Serialize + Clone>(&self, event: &str, payload: S);
-  fn emit_to<S: Serialize + Clone>(
-    &self,
-    window: &str,
-    event: &str,
-    payload: S,
-  );
+  fn emit_to<S: Serialize + Clone>(&self, window: &str, event: &str, payload: S);
 }
 
 impl<R: Runtime> EmitterExt<R> for tauri::AppHandle<R> {
@@ -394,12 +435,7 @@ impl<R: Runtime> EmitterExt<R> for tauri::AppHandle<R> {
     self.state::<AwesomeEmitter>().emit_all(event, payload);
   }
 
-  fn emit_to<S: Serialize + Clone>(
-    &self,
-    window: &str,
-    event: &str,
-    payload: S,
-  ) {
+  fn emit_to<S: Serialize + Clone>(&self, window: &str, event: &str, payload: S) {
     self.state::<AwesomeEmitter>().emit(window, event, payload);
   }
 }
@@ -409,12 +445,7 @@ impl<R: Runtime> EmitterExt<R> for tauri::Window<R> {
     self.state::<AwesomeEmitter>().emit_all(event, payload);
   }
 
-  fn emit_to<S: Serialize + Clone>(
-    &self,
-    window: &str,
-    event: &str,
-    payload: S,
-  ) {
+  fn emit_to<S: Serialize + Clone>(&self, window: &str, event: &str, payload: S) {
     self.state::<AwesomeEmitter>().emit(window, event, payload);
   }
 }
