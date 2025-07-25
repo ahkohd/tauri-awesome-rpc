@@ -138,7 +138,7 @@ impl AwesomeRpc {
       port,
       allowed_origins,
       invoke_timeout,
-      max_connections: None,
+      max_connections: Some(1), // Default to 1 connection for single app
       max_payload: None,
       max_in_buffer_capacity: None,
       max_out_buffer_capacity: None,

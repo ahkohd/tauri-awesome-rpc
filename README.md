@@ -203,7 +203,7 @@ Configure WebSocket buffer capacities to handle large payloads:
 
 ```rust
 let awesome_rpc = AwesomeRpc::new(allowed_origins)
-  .max_connections(1000)                      // Default: 100
+  .max_connections(2)                          // Default: 1 (single app connection)
   .max_payload(50 * 1024 * 1024)             // Default: 10MB
   .max_in_buffer_capacity(100 * 1024 * 1024)  // Default: 10MB
   .max_out_buffer_capacity(100 * 1024 * 1024); // Default: 10MB
