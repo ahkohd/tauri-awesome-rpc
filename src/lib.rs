@@ -126,10 +126,6 @@ pub struct AwesomeRpc {
 
 impl AwesomeRpc {
   pub fn new(allowed_origins: Vec<&str>) -> Self {
-    Self::with_timeout(allowed_origins, Duration::from_secs(30)) // Default 30 second timeout
-  }
-
-  pub fn with_timeout(allowed_origins: Vec<&str>, invoke_timeout: Duration) -> Self {
     let port = portpicker::pick_unused_port().expect("failed to get unused port for invoke");
     let allowed_origins =
       DomainsValidation::AllowOnly(allowed_origins.iter().map(|i| i.into()).collect());
@@ -137,12 +133,18 @@ impl AwesomeRpc {
     Self {
       port,
       allowed_origins,
-      invoke_timeout,
+      invoke_timeout: Duration::from_secs(30), // Default 30 second timeout
       max_connections: Some(1), // Default to 1 connection for single app
       max_payload: None,
       max_in_buffer_capacity: None,
       max_out_buffer_capacity: None,
     }
+  }
+
+
+  pub fn invoke_timeout(mut self, timeout: Duration) -> Self {
+    self.invoke_timeout = timeout;
+    self
   }
 
   pub fn max_connections(mut self, max_connections: usize) -> Self {

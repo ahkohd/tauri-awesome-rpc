@@ -182,19 +182,17 @@ const unlisten = window.AwesomeListener.once('event-name', (data) => {
 
 ## Advanced Configuration
 
-### Custom Timeout
+### Custom Configuration
 
 ```rust
 use std::time::Duration;
 
-// Default: 30 seconds
+// Default configuration
 let awesome_rpc = AwesomeRpc::new(allowed_origins);
 
-// Custom timeout
-let awesome_rpc = AwesomeRpc::with_timeout(
-  allowed_origins, 
-  Duration::from_secs(60)
-);
+// Custom configuration with builder pattern
+let awesome_rpc = AwesomeRpc::new(allowed_origins)
+  .invoke_timeout(Duration::from_secs(60));  // Default: 30 seconds
 ```
 
 ### WebSocket Buffer Configuration
