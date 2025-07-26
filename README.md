@@ -6,7 +6,7 @@ A custom invoke system for Tauri v2 that replaces the default IPC with a WebSock
 
 - **🚀 JSON-RPC 2.0 over WebSocket** - Full spec compliance with request/response correlation
 - **🔌 Single Persistent Connection** - Efficient connection management with automatic reconnection
-- **📡 Request Multiplexing** - Multiple concurrent requests over one WebSocket connection  
+- **📡 Request Multiplexing** - Multiple concurrent requests over one WebSocket connection
 - **⚡ Event System** - Alternative event API with both continuous and one-time listeners
 - **🎯 Backend Event Listening** - Rust-side event subscriptions with convenient macros
 - **⏱️ Configurable Timeouts** - Per-instance timeout configuration
@@ -42,17 +42,17 @@ fn main() {
     .invoke_system(awesome_rpc.initialization_script())
     .setup(move |app| {
       awesome_rpc.start(app.handle().clone());
-      
+
       // Optional: Setup backend event listeners
       let handle = app.handle();
-      
+
       let _unlisten = handle.listen("user-action", |payload| {
         println!("User action: {:?}", payload);
       });
-      
+
       // Emit an event
       handle.emit("app-ready", json!({"version": "1.0.0"}));
-      
+
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![my_command])
@@ -68,33 +68,29 @@ fn my_command(name: String) -> String {
 
 ### 2. Frontend Setup
 
-Add TypeScript types to your `global.d.ts`:
+Install the npm package:
 
-```typescript
-interface Window {
-  AwesomeListener: {
-    listen(eventName: string, callback: (data: any) => void): () => void;
-    once(eventName: string, callback: (data: any) => void): () => void;
-  };
-}
+```bash
+npm install tauri-awesome-rpc
 ```
 
 Use in your frontend code:
 
 ```typescript
 import { invoke } from "@tauri-apps/api/tauri";
+import { listen, once } from "tauri-awesome-rpc";
 
 // Regular Tauri invoke - automatically uses WebSocket
-const result = await invoke('my_command', { name: 'World' });
+const result = await invoke("my_command", { name: "World" });
 
 // Listen to backend events
-const unlisten = window.AwesomeListener.listen('backend-event', (data) => {
-  console.log('Received:', data);
+const _unlisten = listen("backend-event", (data) => {
+  console.log("Received:", data);
 });
 
 // One-time event listener
-window.AwesomeListener.once('app-ready', (data) => {
-  console.log('App initialized:', data);
+const _unlisten = once("app-ready", (data) => {
+  console.log("App initialized:", data);
 });
 ```
 
@@ -126,6 +122,7 @@ unlisten();
 ```
 
 **Note**: If you import both `tauri::Emitter` and `tauri_awesome_rpc::EmitterExt`, you'll get a conflict. Solutions:
+
 - Use only `EmitterExt` for WebSocket transport
 - Import with aliases: `use tauri::Emitter as TauriEmitter;`
 - Use fully qualified syntax: `EmitterExt::emit(&handle, "event", data)?;`
@@ -155,14 +152,14 @@ let unlisten = once!(app_handle, "event-name", |payload| {
 #### Using TypeScript Module
 
 ```typescript
-import { listen, once } from '@tauri-awesome-rpc/api';
+import { listen, once } from "tauri-awesome-rpc";
 
-const unlisten = listen('event-name', (data) => {
-  console.log('Event:', data);
+const unlisten = listen("event-name", (data) => {
+  console.log("Event:", data);
 });
 
-const unlisten = once('startup-event', (data) => {
-  console.log('Startup:', data);
+const unlisten = once("startup-event", (data) => {
+  console.log("Startup:", data);
 });
 ```
 
@@ -170,13 +167,13 @@ const unlisten = once('startup-event', (data) => {
 
 ```typescript
 // Continuous listener
-const unlisten = window.AwesomeListener.listen('event-name', (data) => {
-  console.log('Event:', data);
+const unlisten = window.AwesomeListener.listen("event-name", (data) => {
+  console.log("Event:", data);
 });
 
-// One-time listener  
-const unlisten = window.AwesomeListener.once('event-name', (data) => {
-  console.log('Once:', data);
+// One-time listener
+const unlisten = window.AwesomeListener.once("event-name", (data) => {
+  console.log("Once:", data);
 });
 ```
 
@@ -208,6 +205,7 @@ let awesome_rpc = AwesomeRpc::new(allowed_origins)
 ```
 
 This is particularly useful when:
+
 - Reading large files through the RPC system
 - Handling high-volume data transfers
 - Supporting many concurrent connections
@@ -240,8 +238,9 @@ let allowed_origins = if cfg!(dev) {
 #### Frontend → Backend
 
 All standard Tauri APIs automatically use WebSocket:
+
 - `invoke()` commands
-- `emit()` / `emitTo()` from JavaScript  
+- `emit()` / `emitTo()` from JavaScript
 - Plugin invocations
 
 #### Backend → Frontend
@@ -255,11 +254,11 @@ use tauri_awesome_rpc::{EmitterExt, ListenerExt};
 app_handle.emit("event", data);
 app_handle.emit_to("main", "event", data);
 
-let unlisten = app_handle.listen("event", |payload| { 
+let unlisten = app_handle.listen("event", |payload| {
   println!("Received: {:?}", payload);
 });
 
-let unlisten_once = app_handle.once("startup", |payload| { 
+let unlisten_once = app_handle.once("startup", |payload| {
   println!("Startup event: {:?}", payload);
 });
 
@@ -271,15 +270,18 @@ let unlisten_once = app_handle.once("startup", |payload| {
 ### Event System Behavior
 
 When you import `tauri_awesome_rpc::EmitterExt`:
+
 - `app_handle.emit()`, `app_handle.emit_to()` uses WebSocket transport
 - `window.emit()`, `window.emit_to()` uses WebSocket transport
 
 When you import `tauri_awesome_rpc::ListenerExt`:
+
 - `app_handle.listen()`, `app_handle.once()` listens to WebSocket events
 - `window.listen()`, `window.once()` listens to WebSocket events
 - These shadow Tauri's built-in event listeners
 
 Without importing the extension traits:
+
 - `app_handle.emit()` uses Tauri's standard IPC
 - `app_handle.listen()`, `window.listen()` use Tauri's standard event system
 - You can still use macros: `emit!`, `listen!`, `once!` for WebSocket transport
@@ -289,6 +291,7 @@ Without importing the extension traits:
 All commands invoked through awesome-rpc run in an async context, not on the main thread. This differs from Tauri's default behavior where sync commands run on the main thread.
 
 **This is actually a benefit!** Running commands async by default:
+
 - Prevents accidental blocking of the main thread with long-running sync operations
 - Keeps the UI responsive during command execution
 - Makes main thread usage explicit and intentional
@@ -300,7 +303,7 @@ If you need main thread execution (e.g., for UI operations):
 #[tauri::command]
 fn my_sync_command(app: tauri::AppHandle) {
   // This runs async with awesome-rpc
-  
+
   // To run on main thread when needed:
   app.run_on_main_thread(|| {
     // UI operations or other main-thread-only code
@@ -310,6 +313,7 @@ fn my_sync_command(app: tauri::AppHandle) {
 ```
 
 This is particularly important for:
+
 - Platform-specific UI operations
 - Libraries that require main thread access
 - Code that depends on sync command behavior
